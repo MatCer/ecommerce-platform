@@ -126,13 +126,13 @@ async fn add_paragraph(runtime: &PgPool, tenant: Uuid, id: Uuid, confirmed: bool
     .await
 }
 
-async fn published_cookie_page(runtime: &PgPool, tenant: Uuid) -> Uuid {
+pub(crate) async fn published_cookie_page(runtime: &PgPool, tenant: Uuid) -> Uuid {
     let id = install_cookie_page(runtime, tenant).await;
     publish(runtime, tenant, id, PageStatus::Published).await;
     id
 }
 
-async fn start(runtime: &PgPool, tenant: Uuid, id: Uuid) -> Result<(), Error> {
+pub(crate) async fn start(runtime: &PgPool, tenant: Uuid, id: Uuid) -> Result<(), Error> {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     experiments::start(&mut tx, ACTOR, id).await?;
     tx.commit().await.unwrap();

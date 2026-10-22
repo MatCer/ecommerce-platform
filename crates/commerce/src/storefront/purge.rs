@@ -32,6 +32,7 @@ pub const EVENTS: &[&str] = &[
     crate::reviews::CHANGED_EVENT,
     crate::ai::review_summary::CHANGED_EVENT,
     crate::ai::settings::CHANGED_EVENT,
+    crate::experiments::CHANGED_EVENT,
 ];
 
 pub fn for_event(event_type: &str, payload: &Value) -> Option<Purge> {
@@ -86,6 +87,10 @@ mod tests {
         );
         assert_eq!(
             for_event("ai_settings.changed", &json!({})),
+            Some(Purge::Tenant)
+        );
+        assert_eq!(
+            for_event("experiment.changed", &json!({})),
             Some(Purge::Tenant)
         );
         assert_eq!(for_event("coupon.created", &json!({})), None);

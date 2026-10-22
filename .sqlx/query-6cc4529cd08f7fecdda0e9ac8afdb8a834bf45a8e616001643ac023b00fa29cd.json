@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE experiments SET status = 'stopped', stop_reason = $2::text,\n                        promoted_at = CASE WHEN $2::text = 'promoted' THEN now() END\n                 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6cc4529cd08f7fecdda0e9ac8afdb8a834bf45a8e616001643ac023b00fa29cd"
+}

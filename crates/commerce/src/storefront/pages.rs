@@ -387,6 +387,21 @@ impl HeroCopy {
     }
 }
 
+/// Merges `hero` into the tenant's stored copy field by field: its fields replace the stored ones,
+/// the others stay.
+pub(crate) async fn save_hero(tx: &mut TenantTx, hero: &HeroCopy) -> Result<(), Error> {
+    let hero = serde_json::to_value(hero).map_err(|e| Error::Internal(e.to_string()))?;
+    sqlx::query!(
+        "INSERT INTO home_settings (tenant_id, hero) VALUES ($1, $2)
+         ON CONFLICT (tenant_id) DO UPDATE SET hero = home_settings.hero || EXCLUDED.hero",
+        tx.tenant_id(),
+        hero
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 fn image_from(variants: &Value, alt: &str) -> Option<Image> {
     let v: Vec<AssetVariant> = serde_json::from_value(variants.clone()).ok()?;
     super::images::from_variants(&v, alt.to_owned())

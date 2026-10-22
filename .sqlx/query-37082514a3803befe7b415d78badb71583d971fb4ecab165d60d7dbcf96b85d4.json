@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.id, e.name, e.version, e.arms, e.status, e.stop_reason, e.promoted_at,\n                  e.theme_revision_id, r.number AS \"revision_number?\", e.created_at, e.started_at,\n                  e.stopped_at\n           FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id\n           WHERE e.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "arms",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "arms"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "stop_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "stop_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "promoted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "promoted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "theme_revision_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "theme_revision_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "revision_number?",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "stopped_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "stopped_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "37082514a3803befe7b415d78badb71583d971fb4ecab165d60d7dbcf96b85d4"
+}

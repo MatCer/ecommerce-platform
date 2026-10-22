@@ -16,7 +16,7 @@ fn arms(keys: &[&str]) -> Value {
         .collect()
 }
 
-async fn artifact(db: &PgPool, id: &str) {
+pub(crate) async fn artifact(db: &PgPool, id: &str) {
     sqlx::query("INSERT INTO platform.theme_artifacts (id, kind) VALUES ($1, 'theme')")
         .bind(id)
         .execute(db)
@@ -24,7 +24,7 @@ async fn artifact(db: &PgPool, id: &str) {
         .unwrap();
 }
 
-async fn revision(
+pub(crate) async fn revision(
     runtime: &PgPool,
     tenant: Uuid,
     number: i32,
