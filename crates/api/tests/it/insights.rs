@@ -61,8 +61,9 @@ async fn staff_list_and_dismiss_their_shops_insights(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::OK);
     let id = body["items"][0]["id"].as_str().unwrap().to_owned();
-    let insight = json!({
+    let mut insight = json!({
         "id": id,
+        "status": "open",
         "detection": { "kind": "slow_page", "template": "product", "metric": "LCP",
                        "p75": 4000.0, "samples": 60, "requests": 20000 },
         "score": 300.0,
@@ -70,6 +71,7 @@ async fn staff_list_and_dismiss_their_shops_insights(db: PgPool) {
         "first_detected_on": day,
         "last_detected_on": day,
         "hypothesis": null,
+        "theme_change": null,
     });
     assert_eq!(body, json!({ "items": [insight.clone()] }));
 
@@ -92,6 +94,7 @@ async fn staff_list_and_dismiss_their_shops_insights(db: PgPool) {
         .tenant(shop.tenant)
         .send(&s)
         .await;
+    insight["status"] = json!("dismissed");
     assert_eq!((status, body), (StatusCode::OK, insight));
     let (_, body, _) = Call::get("/admin/v1/insights")
         .token(&clerk)

@@ -1,5 +1,6 @@
 pub mod detect;
 mod load;
+mod readout;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use platform::Error;
@@ -15,6 +16,7 @@ use crate::ai::{self, Ai, Call, CallError, Outcome, prompts, settings};
 use crate::{analytics, audit};
 use detect::Detection;
 use detect::rules::{FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS};
+pub use readout::{Measure, ThemeChange, Window};
 
 pub const JOB: &str = "insights.run";
 pub const DAILY_MODEL_CALLS: i64 = 3;
@@ -34,10 +36,13 @@ pub fn job(tenant: Uuid, day: NaiveDate) -> NewJob<'static> {
     j
 }
 
-/// A ranked open signal as staff see it.
+/// A ranked signal as staff see it.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct Insight {
     pub id: Uuid,
+    /// `resolved` once the detector stopped firing; such insights are listed only with a
+    /// `theme_change`.
+    pub status: Status,
     pub detection: Detection,
     /// Affected visits per week; the list is ordered by it.
     pub score: f64,
@@ -48,6 +53,17 @@ pub struct Insight {
     pub last_detected_on: NaiveDate,
     /// AI-generated; label it as such.
     pub hypothesis: Option<Hypothesis>,
+    /// The latest theme change published from this insight's draft (`null` when none).
+    pub theme_change: Option<ThemeChange>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = InsightStatus)]
+pub enum Status {
+    Open,
+    Dismissed,
+    Resolved,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -61,6 +77,7 @@ pub struct Hypothesis {
 
 struct Row {
     id: Uuid,
+    status: String,
     detection: Value,
     score: f64,
     product_name: Option<String>,
@@ -70,10 +87,22 @@ struct Row {
     theme_prompt: Option<String>,
     hypothesis_model: Option<String>,
     hypothesis_at: Option<DateTime<Utc>>,
+    revision_id: Option<Uuid>,
+    revision_number: Option<i32>,
+    published_at: Option<DateTime<Utc>>,
 }
 
 fn parse_detection(v: Value) -> Result<Detection, Error> {
     serde_json::from_value(v).map_err(|e| Error::Internal(format!("stored detection: {e}")))
+}
+
+fn parse_status(s: &str) -> Result<Status, Error> {
+    match s {
+        "open" => Ok(Status::Open),
+        "dismissed" => Ok(Status::Dismissed),
+        "resolved" => Ok(Status::Resolved),
+        other => Err(Error::Internal(format!("stored insight status: {other}"))),
+    }
 }
 
 impl TryFrom<Row> for Insight {
@@ -96,42 +125,82 @@ impl TryFrom<Row> for Insight {
         };
         Ok(Self {
             id: r.id,
+            status: parse_status(&r.status)?,
             detection: parse_detection(r.detection)?,
             score: r.score,
             product_name: r.product_name,
             first_detected_on: r.first_detected_on,
             last_detected_on: r.last_detected_on,
             hypothesis,
+            theme_change: None,
         })
     }
 }
 
-pub async fn list(tx: &mut TenantTx) -> Result<Vec<Insight>, Error> {
-    select(tx, None).await
+/// Open signals, and resolved ones a published theme change came from. `today` decides which
+/// readout windows are over.
+pub async fn list(tx: &mut TenantTx, today: NaiveDate) -> Result<Vec<Insight>, Error> {
+    select(tx, None, today).await
 }
 
-async fn select(tx: &mut TenantTx, id: Option<Uuid>) -> Result<Vec<Insight>, Error> {
-    sqlx::query_as!(
+async fn select(
+    tx: &mut TenantTx,
+    id: Option<Uuid>,
+    today: NaiveDate,
+) -> Result<Vec<Insight>, Error> {
+    let rows = sqlx::query_as!(
         Row,
-        r#"SELECT id, detection, score, first_detected_on, last_detected_on, hypothesis,
-                  theme_prompt, hypothesis_model, hypothesis_at,
-                  CASE WHEN kind = 'low_add_to_cart'
-                       THEN insight_product_name((detection->>'product_id')::uuid) END
-                      AS product_name
-           FROM insight_signals
-           WHERE CASE WHEN $1::uuid IS NULL THEN status = 'open' ELSE id = $1 END
-           ORDER BY score DESC, kind COLLATE "C", subject COLLATE "C" LIMIT $2"#,
+        r#"SELECT s.id, s.status, s.detection, s.score, s.first_detected_on, s.last_detected_on,
+                  s.hypothesis, s.theme_prompt, s.hypothesis_model, s.hypothesis_at,
+                  CASE WHEN s.kind = 'low_add_to_cart'
+                       THEN insight_product_name((s.detection->>'product_id')::uuid) END
+                      AS product_name,
+                  p.id AS "revision_id?", p.number AS "revision_number?",
+                  p.published_at AS "published_at?"
+           FROM insight_signals s
+           LEFT JOIN LATERAL (
+               SELECT v.id, v.number, v.published_at
+               FROM ai_theme_runs r JOIN theme_revisions v ON v.id = r.revision_id
+               WHERE r.insight_id = s.id AND v.published_at IS NOT NULL
+               ORDER BY v.published_at DESC LIMIT 1
+           ) p ON true
+           WHERE CASE WHEN $1::uuid IS NULL
+                      THEN s.status = 'open' OR (s.status = 'resolved' AND p.id IS NOT NULL)
+                      ELSE s.id = $1 END
+           ORDER BY s.score DESC, s.kind COLLATE "C", s.subject COLLATE "C" LIMIT $2"#,
         id,
         LIST_LIMIT
     )
     .fetch_all(&mut **tx)
-    .await?
-    .into_iter()
-    .map(Insight::try_from)
-    .collect()
+    .await?;
+    let mut items = Vec::with_capacity(rows.len());
+    for r in rows {
+        let published = match (r.revision_id, r.revision_number, r.published_at) {
+            (Some(revision_id), Some(revision_number), Some(published_at)) => {
+                Some(readout::Published {
+                    revision_id,
+                    revision_number,
+                    published_at,
+                })
+            }
+            _ => None,
+        };
+        let mut insight = Insight::try_from(r)?;
+        if let Some(p) = published {
+            insight.theme_change =
+                Some(readout::theme_change(tx, &insight.detection, p, today).await?);
+        }
+        items.push(insight);
+    }
+    Ok(items)
 }
 
-pub async fn dismiss(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Insight, Error> {
+pub async fn dismiss(
+    tx: &mut TenantTx,
+    actor: &str,
+    id: Uuid,
+    today: NaiveDate,
+) -> Result<Insight, Error> {
     let changed = sqlx::query!(
         "UPDATE insight_signals SET status = 'dismissed', dismissed_at = now(), dismissed_by = $2
          WHERE id = $1 AND status <> 'dismissed' RETURNING kind, subject",
@@ -151,7 +220,10 @@ pub async fn dismiss(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Insight
         )
         .await?;
     }
-    select(tx, Some(id)).await?.pop().ok_or(Error::NotFound)
+    select(tx, Some(id), today)
+        .await?
+        .pop()
+        .ok_or(Error::NotFound)
 }
 
 async fn lock_tenant_run(db: &PgPool, tenant: Uuid) -> Result<Option<PgConnection>, Error> {

@@ -1,0 +1,180 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id, s.status, s.detection, s.score, s.first_detected_on, s.last_detected_on,\n                  s.hypothesis, s.theme_prompt, s.hypothesis_model, s.hypothesis_at,\n                  CASE WHEN s.kind = 'low_add_to_cart'\n                       THEN insight_product_name((s.detection->>'product_id')::uuid) END\n                      AS product_name,\n                  p.id AS \"revision_id?\", p.number AS \"revision_number?\",\n                  p.published_at AS \"published_at?\"\n           FROM insight_signals s\n           LEFT JOIN LATERAL (\n               SELECT v.id, v.number, v.published_at\n               FROM ai_theme_runs r JOIN theme_revisions v ON v.id = r.revision_id\n               WHERE r.insight_id = s.id AND v.published_at IS NOT NULL\n               ORDER BY v.published_at DESC LIMIT 1\n           ) p ON true\n           WHERE CASE WHEN $1::uuid IS NULL\n                      THEN s.status = 'open' OR (s.status = 'resolved' AND p.id IS NOT NULL)\n                      ELSE s.id = $1 END\n           ORDER BY s.score DESC, s.kind COLLATE \"C\", s.subject COLLATE \"C\" LIMIT $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "detection",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "detection"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "score"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "first_detected_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "first_detected_on"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "last_detected_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "last_detected_on"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "hypothesis",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "hypothesis"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "theme_prompt",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "theme_prompt"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "hypothesis_model",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "hypothesis_model"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "hypothesis_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "hypothesis_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "product_name",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "revision_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "revision_number?",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "published_at?",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "published_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      null,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "0eed7e9c1d19aec081d6706b299cb6287c9c968478afcac74099ef3b9357515f"
+}

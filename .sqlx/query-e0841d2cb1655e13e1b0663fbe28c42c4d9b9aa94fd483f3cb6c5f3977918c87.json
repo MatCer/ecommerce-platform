@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(round(sum(value) FILTER (WHERE metric = $1)), 0)::bigint AS \"whole!\",\n                  coalesce(round(sum(value) FILTER (WHERE metric = $2)), 0)::bigint AS \"part!\"\n           FROM daily_metrics\n           WHERE metric IN ($1, $2) AND dims = $3 AND date BETWEEN $4 AND $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "whole!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "part!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Jsonb",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "e0841d2cb1655e13e1b0663fbe28c42c4d9b9aa94fd483f3cb6c5f3977918c87"
+}

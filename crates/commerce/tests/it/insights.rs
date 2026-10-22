@@ -4,8 +4,9 @@ use std::time::Duration;
 use chrono::{Days, NaiveDate, Utc};
 use commerce::ai::settings::{self, AiSettingsChange};
 use commerce::ai::{Ai, Outcome};
-use commerce::insights::detect::{Detection, Pair, Transition};
-use commerce::insights::{self, Insight};
+use commerce::insights::detect::{Detection, Pair, Transition, Vital};
+use commerce::insights::{self, Insight, Measure, Status, ThemeChange, Window};
+use commerce::themes::{self, RevisionSummary};
 use platform::ai::{Client, Fake};
 use platform::db::tenant_tx;
 use serde_json::{Value, json};
@@ -118,16 +119,17 @@ async fn vitals(
     tx.commit().await.unwrap();
 }
 
+fn funnel(v: [f64; 5]) -> [(&'static str, f64); 5] {
+    [
+        ("sessions", v[0]),
+        ("funnel.view_item", v[1]),
+        ("funnel.add_to_cart", v[2]),
+        ("funnel.begin_checkout", v[3]),
+        ("funnel.purchase", v[4]),
+    ]
+}
+
 async fn fixture(runtime: &PgPool, shop: &Shop, day: NaiveDate, home: bool) -> Uuid {
-    let funnel = |v: [f64; 5]| {
-        [
-            ("sessions", v[0]),
-            ("funnel.view_item", v[1]),
-            ("funnel.add_to_cart", v[2]),
-            ("funnel.begin_checkout", v[3]),
-            ("funnel.purchase", v[4]),
-        ]
-    };
     let recent = day - Days::new(1);
     metric(
         runtime,
@@ -192,7 +194,9 @@ async fn run(runtime: &PgPool, ai: &Ai, shop: &Shop, day: NaiveDate) {
 
 async fn list(runtime: &PgPool, tenant: Uuid) -> Vec<Insight> {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
-    insights::list(&mut tx).await.unwrap()
+    insights::list(&mut tx, Utc::now().date_naive())
+        .await
+        .unwrap()
 }
 
 type Ranked = (String, String, f64, Option<String>, NaiveDate, NaiveDate);
@@ -347,8 +351,12 @@ async fn dismissed_stays_dismissed_and_gone_signals_resolve_and_reopen(db: PgPoo
     let slow = list(&runtime, shop.tenant).await[0].id;
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-    let dismissed = insights::dismiss(&mut tx, "clerk", slow).await.unwrap();
-    let again = insights::dismiss(&mut tx, "clerk", slow).await.unwrap();
+    let dismissed = insights::dismiss(&mut tx, "clerk", slow, day)
+        .await
+        .unwrap();
+    let again = insights::dismiss(&mut tx, "clerk", slow, day)
+        .await
+        .unwrap();
     let audits: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM audit_log WHERE action = 'insight.dismissed' AND entity_id = $1",
     )
@@ -432,7 +440,7 @@ async fn another_tenant_cannot_list_or_dismiss_signals(db: PgPool) {
     let id = list(&runtime, a.tenant).await[0].id;
     assert_eq!(list(&runtime, b.tenant).await, vec![]);
     let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
-    let err = insights::dismiss(&mut tx, "intruder", id)
+    let err = insights::dismiss(&mut tx, "intruder", id, day)
         .await
         .unwrap_err();
     assert!(matches!(err, platform::Error::NotFound), "{err:?}");
@@ -708,5 +716,358 @@ async fn the_model_sees_only_aggregates_in_the_shop_language(db: PgPool) {
             "Zvětši tlačítko Do košíku na stránce produktu.",
             "claude-sonnet-5"
         )
+    );
+}
+
+async fn signal(runtime: &PgPool, shop: &Shop, d: &Detection, status: &str) -> Uuid {
+    let id = Uuid::now_v7();
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score, status,
+                                      first_detected_on, last_detected_on)
+         VALUES ($1, $2, $3, $4, $5, 1, $6, current_date, current_date)",
+    )
+    .bind(shop.tenant)
+    .bind(id)
+    .bind(d.kind())
+    .bind(d.subject())
+    .bind(serde_json::to_value(d).unwrap())
+    .bind(status)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    id
+}
+
+/// An accepted AI run started from `insight`, its checked revision published for real.
+async fn publish_from(runtime: &PgPool, shop: &Shop, insight: Option<Uuid>) -> RevisionSummary {
+    let artifact = "a0000000000000000000000000000001";
+    let (run, rev) = (Uuid::now_v7(), Uuid::now_v7());
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO platform.theme_artifacts (id, kind) VALUES ($1, 'theme')
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(artifact)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let base: Uuid = sqlx::query_scalar(
+        "INSERT INTO theme_revisions (tenant_id, number, artifact_id, status, created_by)
+         SELECT $1, coalesce(max(number), 0) + 1, $2, 'ready', 'owner' FROM theme_revisions
+         RETURNING id",
+    )
+    .bind(shop.tenant)
+    .bind(artifact)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO ai_theme_runs (tenant_id, id, base_revision_id, prompt, status, created_by,
+                                    insight_id)
+         VALUES ($1, $2, $3, 'Make it faster.', 'accepted', 'owner', $4)",
+    )
+    .bind(shop.tenant)
+    .bind(run)
+    .bind(base)
+    .bind(insight)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO theme_revisions (tenant_id, id, number, artifact_id, origin, change,
+                                      source_key, status, created_by, ai_run_id)
+         SELECT $1, $2, max(number) + 1, $3, 'custom', 'ai', 'x', 'ready', 'owner', $4
+         FROM theme_revisions",
+    )
+    .bind(shop.tenant)
+    .bind(rev)
+    .bind(artifact)
+    .bind(run)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE ai_theme_runs SET revision_id = $2 WHERE id = $1")
+        .bind(run)
+        .bind(rev)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    republish(runtime, shop, rev).await
+}
+
+async fn republish(runtime: &PgPool, shop: &Shop, rev: Uuid) -> RevisionSummary {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    let published = themes::publish(&mut tx, "owner", rev).await.unwrap();
+    tx.commit().await.unwrap();
+    published
+}
+
+async fn change(
+    runtime: &PgPool,
+    shop: &Shop,
+    insight: Uuid,
+    today: NaiveDate,
+) -> Option<ThemeChange> {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    insights::list(&mut tx, today)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|i| i.id == insight)
+        .unwrap()
+        .theme_change
+}
+
+fn days(d: NaiveDate, n: i64) -> NaiveDate {
+    d + chrono::Duration::days(n)
+}
+
+fn measure(value: Option<f64>, samples: i64) -> Option<Measure> {
+    Some(Measure { value, samples })
+}
+
+fn readout(
+    rev: &RevisionSummary,
+    before: Option<Measure>,
+    after: Option<Measure>,
+) -> Option<ThemeChange> {
+    let published_at = rev.published_at.unwrap();
+    let d = published_at.date_naive();
+    Some(ThemeChange {
+        revision_id: rev.id,
+        revision_number: rev.number,
+        published_at,
+        before: Window {
+            from: days(d, -14),
+            to: days(d, -1),
+            measure: before,
+        },
+        after: Window {
+            from: days(d, 1),
+            to: days(d, 14),
+            measure: after,
+        },
+    })
+}
+
+fn funnel_drop(transition: Transition) -> Detection {
+    let pair = Pair { from: 500, to: 60 };
+    Detection::FunnelDrop {
+        transition,
+        recent: pair,
+        baseline: pair,
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_theme_change_reads_out_the_full_weeks_around_its_publish_day(db: PgPool) {
+    let (runtime, shop) = setup(&db, "win").await;
+    let insight = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::ViewItemToAddToCart),
+        "open",
+    )
+    .await;
+    let rev = publish_from(&runtime, &shop, Some(insight)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    for (day, market, v) in [
+        (-15, shop.cz, [9000.0, 1000.0, 1000.0, 9000.0, 9000.0]),
+        (-14, shop.cz, [5000.0, 100.0, 10.0, 3000.0, 1.0]),
+        (-14, shop.sk, [5000.0, 300.0, 30.0, 3000.0, 1.0]),
+        (-1, shop.cz, [5000.0, 400.0, 60.0, 3000.0, 1.0]),
+        (0, shop.cz, [9000.0, 5000.0, 5000.0, 9000.0, 9000.0]),
+        (1, shop.cz, [5000.0, 400.0, 40.0, 3000.0, 1.0]),
+        (14, shop.sk, [5000.0, 100.0, 60.0, 3000.0, 1.0]),
+        (15, shop.cz, [9000.0, 7000.0, 0.0, 9000.0, 9000.0]),
+    ] {
+        metric(&runtime, &shop, days(d, day), market, &funnel(v)).await;
+    }
+
+    let before = measure(Some(0.125), 800);
+    assert_eq!(
+        change(&runtime, &shop, insight, days(d, 14)).await,
+        readout(&rev, before, None),
+        "the after window collects until its last day is over"
+    );
+    assert_eq!(
+        change(&runtime, &shop, insight, days(d, 15)).await,
+        readout(&rev, before, measure(Some(0.2), 500))
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn product_and_slow_page_insights_read_out_their_own_metric(db: PgPool) {
+    let (runtime, shop) = setup(&db, "own").await;
+    let product = signal(
+        &runtime,
+        &shop,
+        &Detection::LowAddToCart {
+            product_id: shop.product,
+            views: 400,
+            adds: 8,
+            shop_views: 1000,
+            shop_adds: 68,
+        },
+        "open",
+    )
+    .await;
+    let rev = publish_from(&runtime, &shop, Some(product)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    let unrelated = Uuid::now_v7();
+    for (day, p, views, adds) in [
+        (-15, shop.product, 1000.0, 0.0),
+        (-14, shop.product, 100.0, 2.0),
+        (-3, shop.product, 400.0, 8.0),
+        (-3, unrelated, 600.0, 60.0),
+        (2, unrelated, 300.0, 30.0),
+    ] {
+        product_metrics(&runtime, &shop, days(d, day), p, views, adds).await;
+    }
+    assert_eq!(
+        change(&runtime, &shop, product, days(d, 15)).await,
+        readout(&rev, measure(Some(0.02), 500), measure(None, 0))
+    );
+
+    let slow = signal(
+        &runtime,
+        &shop,
+        &Detection::SlowPage {
+            template: "product".into(),
+            metric: Vital::Lcp,
+            p75: 4000.0,
+            samples: 60,
+            requests: 20_000,
+        },
+        "open",
+    )
+    .await;
+    let rev = publish_from(&runtime, &shop, Some(slow)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    for (day, sample) in [
+        (-15, ("product", "LCP", 100.0, 100)),
+        (-3, ("product", "LCP", 5000.0, 10)),
+        (-2, ("product", "LCP", 3000.0, 30)),
+        (-2, ("home", "LCP", 9000.0, 10)),
+        (-4, ("product", "INP", 900.0, 10)),
+        (0, ("product", "LCP", 9000.0, 10)),
+        (1, ("product", "LCP", 2000.0, 10)),
+        (15, ("product", "LCP", 9000.0, 10)),
+    ] {
+        let (template, name, value, n) = sample;
+        vitals(
+            &runtime,
+            &shop,
+            days(d, day),
+            (template, name, value, n, 100),
+        )
+        .await;
+    }
+    assert_eq!(
+        change(&runtime, &shop, slow, days(d, 15)).await,
+        readout(&rev, measure(Some(3500.0), 40), measure(Some(2000.0), 10))
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_latest_publish_from_an_insight_wins(db: PgPool) {
+    let (runtime, shop) = setup(&db, "latest").await;
+    let insight = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::ViewItemToAddToCart),
+        "open",
+    )
+    .await;
+    let first = publish_from(&runtime, &shop, Some(insight)).await;
+    let second = publish_from(&runtime, &shop, Some(insight)).await;
+    let shown = |c: Option<ThemeChange>| c.map(|c| (c.revision_id, c.published_at));
+    let today = Utc::now().date_naive();
+    assert_eq!(
+        shown(change(&runtime, &shop, insight, today).await),
+        Some((second.id, second.published_at.unwrap()))
+    );
+    let rollback = republish(&runtime, &shop, first.id).await;
+    assert!(rollback.published_at > second.published_at);
+    assert_eq!(
+        shown(change(&runtime, &shop, insight, today).await),
+        Some((first.id, rollback.published_at.unwrap()))
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_resolved_insight_stays_listed_while_a_change_from_it_is_published(db: PgPool) {
+    let (runtime, shop) = setup(&db, "resolved").await;
+    let open = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::SessionsToViewItem),
+        "open",
+    )
+    .await;
+    let linked = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::ViewItemToAddToCart),
+        "resolved",
+    )
+    .await;
+    signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::AddToCartToBeginCheckout),
+        "resolved",
+    )
+    .await;
+    let dismissed = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::BeginCheckoutToPurchase),
+        "open",
+    )
+    .await;
+    publish_from(&runtime, &shop, Some(linked)).await;
+    let rev = publish_from(&runtime, &shop, Some(dismissed)).await;
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let gone = insights::dismiss(&mut tx, "clerk", dismissed, Utc::now().date_naive())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        (gone.status, gone.theme_change.map(|c| c.revision_id)),
+        (Status::Dismissed, Some(rev.id))
+    );
+
+    let listed: Vec<(Uuid, Status, bool)> = list(&runtime, shop.tenant)
+        .await
+        .into_iter()
+        .map(|i| (i.id, i.status, i.theme_change.is_some()))
+        .collect();
+    assert_eq!(
+        listed,
+        vec![
+            (open, Status::Open, false),
+            (linked, Status::Resolved, true)
+        ]
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_publish_from_a_run_without_an_insight_links_nothing(db: PgPool) {
+    let (runtime, shop) = setup(&db, "unlinked").await;
+    let insight = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::ViewItemToAddToCart),
+        "open",
+    )
+    .await;
+    publish_from(&runtime, &shop, None).await;
+    assert_eq!(
+        change(&runtime, &shop, insight, Utc::now().date_naive()).await,
+        None
     );
 }

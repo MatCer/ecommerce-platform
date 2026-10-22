@@ -1,6 +1,7 @@
 use axum::Json;
 use axum::extract::rejection::PathRejection;
 use axum::extract::{Path, State};
+use chrono::Utc;
 use commerce::insights::{self, Insight};
 use platform::Error;
 use serde::Serialize;
@@ -21,7 +22,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct InsightList {
-    /// Open signals, most affected visits first (at most 50).
+    /// Open signals, and resolved ones a published theme change came from; most affected
+    /// visits first (at most 50).
     pub items: Vec<Insight>,
 }
 
@@ -38,7 +40,11 @@ async fn list_insights(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<Json<InsightList>, Error> {
-    let items = in_tx(&s, staff.tenant_id, async |tx| insights::list(tx).await).await?;
+    let today = Utc::now().date_naive();
+    let items = in_tx(&s, staff.tenant_id, async |tx| {
+        insights::list(tx, today).await
+    })
+    .await?;
     Ok(Json(InsightList { items }))
 }
 
@@ -63,7 +69,7 @@ async fn dismiss_insight(
     let actor = &staff.user.user_id;
     Ok(Json(
         in_tx(&s, staff.tenant_id, async |tx| {
-            insights::dismiss(tx, actor, id).await
+            insights::dismiss(tx, actor, id, Utc::now().date_naive()).await
         })
         .await?,
     ))
