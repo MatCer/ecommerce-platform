@@ -23155,6 +23155,14 @@
             "format": "uuid",
             "description": "The revision to start from; default: the active one. Must have passed the checks."
           },
+          "insight_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The insight whose draft the run starts from; unknown or another shop's: 404."
+          },
           "prompt": {
             "type": "string",
             "description": "What the merchant wants changed (1–4000 characters)."
@@ -29560,9 +29568,10 @@
       },
       "Insight": {
         "type": "object",
-        "description": "A ranked open signal as staff see it.",
+        "description": "A ranked signal as staff see it.",
         "required": [
           "id",
+          "status",
           "detection",
           "score",
           "first_detected_on",
@@ -29606,6 +29615,21 @@
             "type": "number",
             "format": "double",
             "description": "Affected visits per week; the list is ordered by it."
+          },
+          "status": {
+            "$ref": "#/components/schemas/InsightStatus",
+            "description": "`resolved` once the detector stopped firing; such insights are listed only with a\n`theme_change`."
+          },
+          "theme_change": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InsightThemeChange",
+                "description": "The latest theme change published from this insight's draft (`null` when none)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -29620,7 +29644,98 @@
             "items": {
               "$ref": "#/components/schemas/Insight"
             },
-            "description": "Open signals, most affected visits first (at most 50)."
+            "description": "Open signals, and resolved ones a published theme change came from; most affected\nvisits first (at most 50)."
+          }
+        }
+      },
+      "InsightMeasure": {
+        "type": "object",
+        "description": "The detector's own metric over one window.",
+        "required": [
+          "samples"
+        ],
+        "properties": {
+          "samples": {
+            "type": "integer",
+            "format": "int64",
+            "description": "What the value rests on: sessions at the from-step, product views, or measurements."
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);\nslow page: the vital's p75 (ms; CLS unitless). `null` without data."
+          }
+        }
+      },
+      "InsightStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "dismissed",
+          "resolved"
+        ]
+      },
+      "InsightThemeChange": {
+        "type": "object",
+        "description": "The latest theme revision published from an AI run started on this insight's draft.",
+        "required": [
+          "revision_id",
+          "revision_number",
+          "published_at",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/InsightWindow",
+            "description": "The 14 full UTC days after the publish day."
+          },
+          "before": {
+            "$ref": "#/components/schemas/InsightWindow",
+            "description": "The 14 full UTC days before the publish day."
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revision_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision_number": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "InsightWindow": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "measure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InsightMeasure",
+                "description": "`null` (\"collecting\") until the window's last day is over."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
           }
         }
       },
