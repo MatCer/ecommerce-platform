@@ -732,7 +732,7 @@ struct Group {
     pub existing: Option<Uuid>,
 }
 
-fn sku_ok(s: &str) -> bool {
+pub(super) fn sku_ok(s: &str) -> bool {
     (1..=64).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_graphic())
 }
 

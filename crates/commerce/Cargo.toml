@@ -19,6 +19,7 @@ flate2.workspace = true
 similar.workspace = true
 hex.workspace = true
 hmac.workspace = true
+html5ever.workspace = true
 image.workspace = true
 infer.workspace = true
 object_store.workspace = true
