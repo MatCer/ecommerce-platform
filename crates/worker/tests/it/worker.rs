@@ -1369,6 +1369,85 @@ async fn a_job_that_reads_the_switch_before_the_re_enable_commits_is_covered(db:
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn toggles_while_a_backfill_pass_runs_end_with_current_summaries(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "busy-backfill").await;
+    let second = testkit::catalog::product(&runtime, shop.tenant, "B", 1)
+        .await
+        .id;
+    let mut products = vec![shop.product, second];
+    products.sort();
+    for product in &products {
+        verified_reviews(&runtime, shop.tenant, *product, 5).await;
+    }
+    let mut pass = db.acquire().await.unwrap();
+    sqlx::query("SELECT pg_advisory_lock(hashtextextended('review_summary_backfill:' || $1, 0))")
+        .bind(shop.tenant.to_string())
+        .execute(&mut *pass)
+        .await
+        .unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let first: i64 = sqlx::query_scalar(
+        "SELECT id FROM queue.jobs WHERE tenant_id = $1 AND kind = 'ai.review_summary_backfill'",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    wait_for_status(&db, first, "running").await;
+    switch_review_summaries(&runtime, shop.tenant, false).await;
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    wait_for_status(&db, first, "done").await;
+    assert_eq!(
+        summary_calls(&runtime, shop.tenant).await,
+        0,
+        "the superseded pass gave up without the lock"
+    );
+
+    sqlx::query("SELECT pg_advisory_unlock(hashtextextended('review_summary_backfill:' || $1, 0))")
+        .bind(shop.tenant.to_string())
+        .execute(&mut *pass)
+        .await
+        .unwrap();
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let rows: Vec<(uuid::Uuid, String)> = sqlx::query_as(
+        "SELECT product_id, locale FROM review_summaries ORDER BY product_id, locale",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+    drop(tx);
+    let every_product: Vec<(uuid::Uuid, String)> = products
+        .iter()
+        .flat_map(|p| [(*p, "cs".to_owned()), (*p, "sk".to_owned())])
+        .collect();
+    assert_eq!(
+        (rows, summary_calls(&runtime, shop.tenant).await),
+        (every_product, 2),
+        "the last switch-on summarizes each product once"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool) {
     use commerce::ai::settings::{self, AiSettingsChange};
 
