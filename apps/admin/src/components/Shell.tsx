@@ -84,6 +84,7 @@ const groups: { icon: IconName; label: () => string; items: NavItem[] }[] = [
       { href: "/content/legal", label: () => t("content.legal"), min: "staff" },
       { href: "/content/redirects", label: () => t("redirects.title"), min: "staff" },
       { href: "/themes", label: () => t("nav.themes"), min: "staff" },
+      { href: "/experiments", label: () => t("nav.experiments"), min: "admin" },
     ],
   },
   {

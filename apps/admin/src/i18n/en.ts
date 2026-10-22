@@ -875,6 +875,7 @@ export const en = {
   },
   nav: {
     themes: "Theme",
+    experiments: "Experiments",
     collections: "Collections",
     recommendations: "Recommendations",
     aiBulk: "AI bulk edit",
@@ -1206,6 +1207,21 @@ export const en = {
     not_dead: "Only dead jobs can be requeued.",
     not_a_superadmin: "Only platform superadmins can do this.",
     service_unavailable: "The service is temporarily unavailable.",
+    cookie_policy_outdated:
+      "Publish the cookie page from the current legal template in every market language first.",
+    experiment_running: "Another experiment is running. Stop it first.",
+    experiment_not_draft: "Only a draft can start.",
+    experiment_not_running: "The experiment is not running any more.",
+    experiment_not_started: "Start the experiment first.",
+    experiment_not_promotable:
+      "This variant is part of the theme code and cannot be published from here.",
+    experiment_exists: "Someone created this experiment at the same moment. Try again.",
+    invalid_experiment_name:
+      "Use lowercase letters, digits, - and _ (at most 64 characters, starting with a letter or digit).",
+    invalid_experiment_config:
+      "Fill in at least one text, each at most 200 characters, in your markets' languages.",
+    unknown_theme_revision: "That theme revision does not exist.",
+    theme_revision_not_ready: "That theme revision has not passed its checks or was cleaned up.",
   },
   auth: {
     signInTitle: "Sign in",
@@ -2422,6 +2438,117 @@ export const en = {
       "{{metric}} p75 is {{p75}}, above the good limit of {{bound}} ({{samples}} measurements in the last 14 days).",
     zero_result_search:
       "{{searches}} searches in the last 14 days found no products (all languages together).",
+  },
+  experiments: {
+    title: "Experiments",
+    intro:
+      "Test a new hero text or theme revision against your current shop. Only visitors who accepted analytics take part.",
+    new: "New experiment",
+    emptyTitle: "No experiments yet",
+    emptyBody: "Create a draft, then start it once your cookie page covers experiments.",
+    name: "{{name}} · v{{version}}",
+    columns: {
+      name: "Name",
+      change: "Variant",
+      status: "Status",
+      started: "Started",
+      stopped: "Stopped",
+    },
+    status: { draft: "Draft", running: "Running", stopped: "Stopped" },
+    change: {
+      hero: "Hero text",
+      theme: "Theme revision #{{number}}",
+      component: "Theme code",
+    },
+    stopShort: {
+      manual: "Manually",
+      promoted: "Variant published",
+      srm: "Uneven split",
+      harm: "Variant sold less",
+      max_duration: "56-day limit",
+    },
+    changeTitle: "What the variant changes",
+    startedOn: "Started on {{date}}.",
+    promotedOn: "The variant was published on {{date}}.",
+    form: {
+      title: "New experiment",
+      name: "Name",
+      nameHint: "Lowercase letters, digits, - and _. Reusing a name creates its next version.",
+      kind: "What the variant changes",
+      hero: "Hero text",
+      theme: "Theme revision",
+      heroTitle: "Title",
+      heroSubtitle: "Subtitle",
+      heroCta: "Button label",
+      heroHint: "Leave a field empty to keep the current text.",
+      revision: "Revision",
+      noRevisions: "No theme revision has passed its checks yet.",
+      themesLink: "Open themes",
+      submit: "Create draft",
+      created: "Draft created",
+    },
+    readout: {
+      title: "Result",
+      asOf: "Data up to {{date}}.",
+      countedHint:
+        "Counted visitors were assigned at least 7 days ago; a purchase counts within 7 days of their first visit.",
+      caption: "Visitors and buyers of each version",
+      lossHint:
+        "Expected loss is the conversion rate you give up, in percentage points, if you keep that version and it is the worse one.",
+      control: "Current version",
+      variant: "Variant",
+      points: "{{n}} pp",
+      columns: {
+        version: "Version",
+        assigned: "Visitors",
+        counted: "Counted",
+        buyers: "Buyers",
+        rate: "Conversion rate",
+        best: "Chance to be better",
+        loss: "Expected loss",
+      },
+    },
+    state: {
+      draft: "Not started yet.",
+      tooEarly: "Collecting data. The first result is possible on {{date}}.",
+      fewBuyers:
+        "Collecting data. Each version needs at least {{min}} buyers; so far the current version has {{control}} and the variant {{variant}}.",
+      unclear: "Collecting data. Neither version is clearly ahead yet.",
+      winnerVariant: "The variant sells better: {{chance}} chance it is the better version.",
+      winnerControl:
+        "The current version sells better: {{chance}} chance it is the better version. Keep it.",
+      same: "Both versions sell about the same. Keeping the current version costs nothing.",
+      noWinner: "The experiment ended without a clear difference. Keep the current version.",
+      notEnough: "The experiment stopped before there was enough data for a decision.",
+      untrusted: "Visitors were not split as planned, so these results cannot be trusted.",
+    },
+    stopReason: {
+      manual: "Stopped manually on {{date}}.",
+      promoted: "Stopped on {{date}} when the variant was published.",
+      srm: "Stopped automatically on {{date}} because visitors were not assigned in the planned split.",
+      harm: "Stopped automatically on {{date}} because the variant was very likely reducing purchases.",
+      max_duration: "Stopped automatically on {{date}} at the 56-day limit.",
+    },
+    actions: {
+      start: "Start",
+      stop: "Stop",
+      promoteTheme: "Publish revision #{{number}}",
+      promoteHero: "Use the variant's hero text",
+      stopTitle: "Stop the experiment?",
+      stopBody:
+        "Every visitor sees the current version again. A stopped experiment cannot start again.",
+      promoteThemeTitle: "Publish theme revision #{{number}}?",
+      promoteHeroTitle: "Use the variant's hero text?",
+      promoteThemeBody: "Every visitor will see theme revision #{{number}} from now on.",
+      promoteHeroBody: "Every visitor will see the variant's hero text from now on.",
+      promoteStops: "The experiment stops.",
+      componentNote:
+        "This variant lives in the theme code, so it cannot be published from here. To keep it, change the theme code.",
+      started: "Experiment started",
+      stopped: "Experiment stopped",
+      promoted: "Variant published",
+    },
+    cookieLink: "Open legal pages",
   },
 };
 
