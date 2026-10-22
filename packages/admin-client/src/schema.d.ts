@@ -8825,7 +8825,8 @@ export interface components {
             control: components["schemas"]["ArmReadout"];
             /**
              * Format: date-time
-             * @description The first snapshot that can name a winner or no difference.
+             * @description The first snapshot that can name a winner or no difference; absent when the experiment
+             *     stopped less than 14 days after its start, so it can never decide.
              */
             decides_from?: string | null;
             /** @description Stopped, and every attribution window has closed. */

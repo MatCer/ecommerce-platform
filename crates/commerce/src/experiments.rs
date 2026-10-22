@@ -396,7 +396,8 @@ pub struct ExperimentDetail {
 pub struct Readout {
     /// The UTC midnight the snapshot counts up to; once stopped, at most the stop plus 7 days.
     pub as_of: DateTime<Utc>,
-    /// The first snapshot that can name a winner or no difference.
+    /// The first snapshot that can name a winner or no difference; absent when the experiment
+    /// stopped less than 14 days after its start, so it can never decide.
     pub decides_from: Option<DateTime<Utc>>,
     /// Stopped, and every attribution window has closed.
     #[serde(rename = "final")]
