@@ -22,6 +22,11 @@ const AFTER = "current_date - 10";
 const LATER = "current_date - 2";
 const SEARCH = "e2e zero kabelka";
 const MARK = "e2e:insights";
+const OTHER = "e2e-insights-other";
+const EXPERIMENTS = `tenant_id = ${DEMO} AND (name = '${OTHER}' OR theme_revision_id IN
+  (SELECT id FROM theme_revisions WHERE tenant_id = ${DEMO} AND created_by = '${MARK}'))`;
+const COOKIES = `tenant_id = ${DEMO} AND legal_type = 'cookies' AND status = 'published'`;
+const COVERS_EXPERIMENTS = "2026-10-16";
 const FUNNEL = [
   "sessions",
   "funnel.view_item",
@@ -34,6 +39,7 @@ let weak = "";
 let strong = "";
 let weakName = "";
 let runsBefore = "";
+let cookieVersion: string | undefined;
 
 const day = (offset: number) =>
   new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(
@@ -42,6 +48,13 @@ const day = (offset: number) =>
 
 function cleanUp(): void {
   sql(`UPDATE ai_settings SET insights = false WHERE tenant_id = ${DEMO}`);
+  sql(`DELETE FROM experiment_assignments WHERE tenant_id = ${DEMO}
+         AND experiment_id IN (SELECT id FROM experiments WHERE ${EXPERIMENTS});
+       DELETE FROM experiments WHERE ${EXPERIMENTS}`);
+  if (cookieVersion !== undefined)
+    sql(
+      `UPDATE pages SET legal_template_version = NULLIF('${cookieVersion}', '') WHERE ${COOKIES}`,
+    );
   sql(`UPDATE ai_theme_runs SET revision_id = NULL WHERE tenant_id = ${DEMO} AND created_by = '${MARK}';
        DELETE FROM theme_revisions WHERE tenant_id = ${DEMO} AND created_by = '${MARK}';
        DELETE FROM ai_theme_runs WHERE tenant_id = ${DEMO} AND created_by = '${MARK}'`);
@@ -356,6 +369,105 @@ test("a published theme change shows the weeks before and after", async ({ brows
   await expect(product.getByText(`Last detected on ${day(0)}`, { exact: true })).toBeVisible();
   await expect(product.getByText(/^Detected since/)).toHaveCount(0);
   await expect(change).toBeVisible();
+
+  await admin.context().close();
+});
+
+test("an accepted AI revision from an insight is tested instead of published", async ({
+  browser,
+}) => {
+  const signal = `(SELECT id FROM insight_signals WHERE tenant_id = ${DEMO}
+                   AND kind = 'slow_page' AND subject = 'blog:INP')`;
+  const prompt = "Load the blog images lazily.";
+  const run = sql(`WITH r AS (
+      INSERT INTO ai_theme_runs (tenant_id, base_revision_id, prompt, status, created_by, insight_id)
+      SELECT ${DEMO}, revision_id, '${prompt}', 'accepted', '${MARK}', ${signal}
+      FROM theme_active WHERE tenant_id = ${DEMO} RETURNING id)
+    SELECT id FROM r`);
+  const revision = sql(`WITH v AS (
+      INSERT INTO theme_revisions (tenant_id, number, artifact_id, origin, source_key, change,
+                                   status, created_by, ai_run_id)
+      SELECT ${DEMO}, (SELECT max(number) + 1 FROM theme_revisions WHERE tenant_id = ${DEMO}),
+             r.artifact_id, 'custom', 'e2e/insights.tar.gz', 'ai', 'ready', '${MARK}', '${run}'
+      FROM theme_active a JOIN theme_revisions r ON r.id = a.revision_id
+      WHERE a.tenant_id = ${DEMO} RETURNING id)
+    SELECT id FROM v`);
+  sql(`UPDATE ai_theme_runs SET revision_id = '${revision}' WHERE id = '${run}'`);
+  const number = sql(`SELECT number FROM theme_revisions WHERE id = '${revision}'`);
+  const version = sql(`SELECT coalesce(legal_template_version, '') FROM pages WHERE ${COOKIES}`);
+  if (version < COVERS_EXPERIMENTS) {
+    cookieVersion = version;
+    sql(`UPDATE pages SET legal_template_version = '${COVERS_EXPERIMENTS}' WHERE ${COOKIES}`);
+  }
+  const arms = JSON.stringify([
+    { key: "control", weight: 50, config: {} },
+    { key: "variant", weight: 50, config: { hero: {} } },
+  ]);
+  sql(`INSERT INTO experiments (tenant_id, name, version, arms, status, started_at)
+       VALUES (${DEMO}, '${OTHER}', 1, '${arms}', 'running', now())`);
+
+  const admin = await signInOwner(browser);
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await admin.goto("/themes");
+  const editor = admin.getByRole("region", { name: /Edit with AI/ });
+  await editor.getByRole("button", { name: prompt }).click();
+  const accepted = editor.getByRole("status").filter({ hasText: `Accepted. Revision #${number}` });
+  await expect(accepted.getByRole("button", { name: `Show revision #${number}` })).toBeVisible();
+  const testIt = accepted.getByRole("button", { name: "Test it" });
+  await expect(testIt).toBeVisible();
+  await accepted.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "test it (phone)");
+  await screenshot(admin, "insights-test-it-phone");
+  await admin.setViewportSize({ width: 1280, height: 900 });
+  await accepted.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "test it (desktop)");
+  await screenshot(admin, "insights-test-it-desktop");
+
+  await testIt.click();
+  await expect(admin).toHaveURL(/\/experiments\/[0-9a-f-]{36}$/);
+  const experiment = admin.url().split("/").pop() ?? "";
+  expect(
+    sql(`SELECT status, theme_revision_id FROM experiments WHERE id = '${experiment}'`),
+    "a draft that tests the run's revision",
+  ).toBe(`draft|${revision}`);
+  const status = admin.getByRole("main").getByText(/^(Draft|Running)$/);
+  await expect(status).toHaveText("Draft");
+  const start = admin.getByRole("button", { name: "Start", exact: true });
+  await start.click();
+  await expect(
+    admin.getByRole("alert").filter({ hasText: "Another experiment is running. Stop it first." }),
+  ).toBeVisible();
+  await expect(status).toHaveText("Draft");
+
+  sql(`UPDATE experiments SET status = 'stopped', stop_reason = 'manual'
+       WHERE tenant_id = ${DEMO} AND name = '${OTHER}'`);
+  await start.click();
+  await expect(status).toHaveText("Running");
+  const readout = admin
+    .getByRole("region", { name: "Result" })
+    .locator("[aria-live=polite]")
+    .first();
+  await expect(readout).toHaveText(/^Collecting data\./);
+  const sentence = (await readout.textContent()) ?? "";
+
+  await admin.goto("/insights");
+  const card = admin
+    .getByRole("list", { name: "Insights" })
+    .getByRole("region", { name: "Blog: INP" });
+  const latest = card.getByRole("region", { name: "Latest experiment" });
+  await expect(latest.getByText("Running", { exact: true })).toBeVisible();
+  await expect(latest.getByText(sentence, { exact: true })).toBeVisible();
+  await expect(latest.getByRole("link", { name: "Open experiment" })).toHaveAttribute(
+    "href",
+    `/experiments/${experiment}`,
+  );
+  await latest.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "insight experiment (desktop)");
+  await screenshot(admin, "insights-experiment-desktop");
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await latest.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "insight experiment (phone)");
+  await screenshot(admin, "insights-experiment-phone");
 
   await admin.context().close();
 });
