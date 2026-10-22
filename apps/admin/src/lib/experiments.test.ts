@@ -288,22 +288,51 @@ describe("expected loss", () => {
 });
 
 describe("hero copy from the form", () => {
-  it("keeps only the texts that were filled in, trimmed", () => {
+  it("keeps the texts filled in every market language, trimmed", () => {
     expect(
-      heroCopy({
-        cs: { title: " Nová kolekce ", subtitle: "", cta: "Nakupovat" },
-        sk: { title: "", subtitle: "   ", cta: "" },
-        en: { title: "", subtitle: "Spring is here", cta: "" },
-      }),
+      heroCopy(
+        {
+          cs: { title: " Nová kolekce ", subtitle: "", cta: "Nakupovat" },
+          sk: { title: "Nová kolekcia", subtitle: "   ", cta: "Nakupovať" },
+        },
+        ["cs", "sk"],
+      ),
     ).toEqual({
-      title: { cs: "Nová kolekce" },
-      subtitle: { en: "Spring is here" },
-      cta: { cs: "Nakupovat" },
+      copy: {
+        title: { cs: "Nová kolekce", sk: "Nová kolekcia" },
+        cta: { cs: "Nakupovat", sk: "Nakupovať" },
+      },
     });
   });
 
-  it("is undefined when every text is empty", () => {
-    expect(heroCopy({ cs: { title: " ", subtitle: "", cta: "" } })).toBeUndefined();
-    expect(heroCopy({})).toBeUndefined();
+  it("is empty when every text is empty", () => {
+    expect(heroCopy({ cs: { title: " ", subtitle: "", cta: "" } }, ["cs", "sk"])).toEqual({
+      copy: undefined,
+    });
+    expect(heroCopy({}, ["cs", "sk"])).toEqual({ copy: undefined });
+  });
+
+  it("refuses a text filled in only some market languages, on each empty one", () => {
+    const input = heroCopy(
+      {
+        cs: { title: "Podzimní výprodej", subtitle: "", cta: "Vybrat si" },
+        sk: { title: "", subtitle: "", cta: "Vybrať si" },
+      },
+      ["cs", "sk"],
+    );
+    const missing = "missing" in input ? input.missing : {};
+    expect(Object.keys(missing)).toEqual(["sk"]);
+    expect(Object.keys(missing.sk ?? {})).toEqual(["title"]);
+    expect(sentences(() => missing.sk?.title)).toEqual({
+      en: "Fill this text in too, or leave it empty in every language.",
+      cs: "Vyplňte i tento text, nebo ho nechte prázdný ve všech jazycích.",
+      sk: "Vyplňte aj tento text, alebo ho nechajte prázdny vo všetkých jazykoch.",
+    });
+
+    const untouched = heroCopy({ cs: { title: "Podzimní výprodej", subtitle: "", cta: "" } }, [
+      "cs",
+      "sk",
+    ]);
+    expect("missing" in untouched && Object.keys(untouched.missing)).toEqual(["sk"]);
   });
 });

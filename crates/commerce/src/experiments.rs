@@ -517,6 +517,28 @@ pub async fn create(
     let (kind, variant, revision) = match &input.change {
         NewChange::Hero { hero } => {
             hero.validate()?;
+            let locales = crate::ai::market_locales(tx).await?;
+            for (field, texts) in [
+                ("title", &hero.title),
+                ("subtitle", &hero.subtitle),
+                ("cta", &hero.cta),
+            ] {
+                let Some(texts) = texts else { continue };
+                let missing: Vec<&str> = locales
+                    .iter()
+                    .filter(|l| !texts.contains_key(*l))
+                    .map(String::as_str)
+                    .collect();
+                if !missing.is_empty() {
+                    return Err(invalid(
+                        CONFIG,
+                        format!(
+                            "the hero {field} needs a text in every market language; missing: {}",
+                            missing.join(", ")
+                        ),
+                    ));
+                }
+            }
             ("hero", json!({ "hero": hero }), None)
         }
         NewChange::Theme { revision_id } => {

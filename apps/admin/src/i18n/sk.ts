@@ -2490,7 +2490,9 @@ export const sk: Dictionary = {
       heroTitle: "Nadpis",
       heroSubtitle: "Podnadpis",
       heroCta: "Text tlačidla",
-      heroHint: "Prázdne pole ponechá súčasný text.",
+      heroHint:
+        "Vyplňte text v každom jazyku, alebo ho všade nechajte prázdny a zostane súčasný text.",
+      heroMissing: "Vyplňte aj tento text, alebo ho nechajte prázdny vo všetkých jazykoch.",
       revision: "Revízia",
       noRevisions: "Zatiaľ žiadna revízia vzhľadu neprešla kontrolami.",
       themesLink: "Otvoriť vzhľad obchodu",

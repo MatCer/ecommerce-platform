@@ -482,6 +482,56 @@ async fn create_refuses_a_bad_name_or_hero_copy(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_hero_text_needs_every_market_language_of_the_shop(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "life-hero-locales").await;
+    let none = HeroCopy {
+        title: None,
+        subtitle: None,
+        cta: None,
+    };
+
+    let refused = create(
+        &runtime,
+        shop.tenant,
+        hero_change("homepage", title("Podzimní výprodej")),
+    )
+    .await;
+    match refused {
+        Err(Error::Validation { code, detail }) => {
+            assert_eq!(code, "invalid_experiment_config");
+            assert!(
+                detail.contains("title") && detail.contains("sk"),
+                "{detail}"
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(list(&runtime, shop.tenant).await.is_empty());
+
+    for (hero, why) in [
+        (
+            HeroCopy {
+                title: texts(&[("cs", "Podzimní výprodej"), ("sk", "Jesenný výpredaj")]),
+                ..none.clone()
+            },
+            "a title in both languages",
+        ),
+        (
+            HeroCopy {
+                cta: texts(&[("cs", "Vybrat si"), ("sk", "Vybrať si")]),
+                ..none.clone()
+            },
+            "only a call to action, in both languages",
+        ),
+    ] {
+        create(&runtime, shop.tenant, hero_change("homepage", hero))
+            .await
+            .unwrap_or_else(|e| panic!("{why}: {e:?}"));
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_theme_change_needs_a_ready_revision_of_the_shop(db: PgPool) {
     let (runtime, tenant) = setup(&db, "life-theme").await;
     let (other, _) = testkit::tenant(&runtime, "life-theme-other").await;
@@ -771,7 +821,7 @@ async fn promoting_hero_experiments_merges_their_copy_into_the_home_page(db: PgP
     let first = HeroCopy {
         title: texts(&[("cs", "Podzimní výprodej"), ("sk", "Jesenný výpredaj")]),
         subtitle: None,
-        cta: texts(&[("cs", "Vybrat si")]),
+        cta: texts(&[("cs", "Vybrat si"), ("sk", "Vybrať si")]),
     };
     let e = started(&runtime, shop.tenant, hero_change("homepage", first)).await;
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
@@ -805,8 +855,8 @@ async fn promoting_hero_experiments_merges_their_copy_into_the_home_page(db: PgP
     );
 
     let second = HeroCopy {
-        title: texts(&[("cs", "Zimní kolekce")]),
-        subtitle: texts(&[("cs", "Doprava zdarma")]),
+        title: texts(&[("cs", "Zimní kolekce"), ("sk", "Zimná kolekcia")]),
+        subtitle: texts(&[("cs", "Doprava zdarma"), ("sk", "Doprava zadarmo")]),
         cta: None,
     };
     let e = started(&runtime, shop.tenant, hero_change("homepage", second)).await;
@@ -856,7 +906,14 @@ async fn a_hero_experiment_stopped_by_hand_can_still_be_promoted(db: PgPool) {
     let e = started(
         &runtime,
         shop.tenant,
-        hero_change("homepage", title("Poslední kusy")),
+        hero_change(
+            "homepage",
+            HeroCopy {
+                title: texts(&[("cs", "Poslední kusy"), ("sk", "Posledné kusy")]),
+                subtitle: None,
+                cta: None,
+            },
+        ),
     )
     .await;
     stop(&runtime, shop.tenant, e.id).await.unwrap();

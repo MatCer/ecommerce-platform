@@ -198,18 +198,25 @@ function CreateDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
   const locales = () => [...new Set((markets.data?.items ?? []).flatMap((m) => m.locales))];
   const ready = () => (revisions.data?.items ?? []).filter(usable);
   const revisionId = () => revision() || ready()[0]?.id || "";
+  const [checked, setChecked] = createSignal(false);
+  const heroInput = () => heroCopy(hero(), locales());
+  const missing = (l: string, f: keyof HeroFields) => {
+    const input = heroInput();
+    const message = checked() && "missing" in input ? input.missing[l]?.[f] : undefined;
+    return message && say(message);
+  };
   const text = (l: string, f: keyof HeroFields) => hero()[l]?.[f] ?? "";
   const setText = (l: string, f: keyof HeroFields, v: string) =>
     setHero((h) => ({ ...h, [l]: { title: "", subtitle: "", cta: "", ...h[l], [f]: v } }));
   const creation = submission();
 
   const create = createMutation(() => ({
-    mutationFn: () => {
+    mutationFn: (copy: Schemas["HeroCopy"] | undefined) => {
       const body: Schemas["NewExperiment"] = {
         name: name().trim(),
         change:
           kind() === "hero"
-            ? { kind: "hero", hero: heroCopy(hero()) ?? {} }
+            ? { kind: "hero", hero: copy ?? {} }
             : { kind: "theme", revision_id: revisionId() },
       };
       return unwrap(
@@ -220,6 +227,7 @@ function CreateDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
       creation.done();
       setName("");
       setHero({});
+      setChecked(false);
       setRevision("");
       props.onOpenChange(false);
       await qc.invalidateQueries({ queryKey: tenantKey("experiments") });
@@ -258,7 +266,13 @@ function CreateDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
         class="flex flex-col gap-5"
         onSubmit={(e) => {
           e.preventDefault();
-          create.mutate();
+          const input = heroInput();
+          if (kind() === "hero" && "missing" in input) {
+            setChecked(true);
+            e.currentTarget.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
+            return;
+          }
+          create.mutate("copy" in input ? input.copy : undefined);
         }}
       >
         <TextField
@@ -341,6 +355,7 @@ function CreateDialog(props: { open: boolean; onOpenChange: (open: boolean) => v
                       label={t(HERO_LABEL[f])}
                       value={text(l, f)}
                       onChange={(v) => setText(l, f, v)}
+                      error={missing(l, f)}
                       maxLength={200}
                     />
                   )}

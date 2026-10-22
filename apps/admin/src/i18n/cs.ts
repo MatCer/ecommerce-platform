@@ -2487,7 +2487,9 @@ export const cs: Dictionary = {
       heroTitle: "Nadpis",
       heroSubtitle: "Podnadpis",
       heroCta: "Text tlačítka",
-      heroHint: "Prázdné pole ponechá současný text.",
+      heroHint:
+        "Vyplňte text v každém jazyce, nebo ho všude nechte prázdný a zůstane současný text.",
+      heroMissing: "Vyplňte i tento text, nebo ho nechte prázdný ve všech jazycích.",
       revision: "Revize",
       noRevisions: "Zatím žádná revize vzhledu neprošla kontrolami.",
       themesLink: "Otevřít vzhled obchodu",

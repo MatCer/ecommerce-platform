@@ -2480,7 +2480,9 @@ export const en = {
       heroTitle: "Title",
       heroSubtitle: "Subtitle",
       heroCta: "Button label",
-      heroHint: "Leave a field empty to keep the current text.",
+      heroHint:
+        "Fill a text in every language, or leave it empty in all of them to keep the current text.",
+      heroMissing: "Fill this text in too, or leave it empty in every language.",
       revision: "Revision",
       noRevisions: "No theme revision has passed its checks yet.",
       themesLink: "Open themes",

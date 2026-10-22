@@ -10,7 +10,8 @@ export interface Message {
   key:
     | `experiments.state.${StateKey}`
     | StopKey
-    | `experiments.change.${keyof Copy["change"] & string}`;
+    | `experiments.change.${keyof Copy["change"] & string}`
+    | "experiments.form.heroMissing";
   params: Record<string, string>;
 }
 
@@ -91,14 +92,24 @@ export function changeMessage(e: Schemas["Experiment"]): Message {
 }
 
 export const HERO_FIELDS = ["title", "subtitle", "cta"] as const;
-export type HeroFields = Record<(typeof HERO_FIELDS)[number], string>;
+type HeroField = (typeof HERO_FIELDS)[number];
+export type HeroFields = Record<HeroField, string>;
+export type HeroInput =
+  | { copy: Schemas["HeroCopy"] | undefined }
+  | { missing: Record<string, Partial<Record<HeroField, Message>>> };
 
-export function heroCopy(fields: Record<string, HeroFields>): Schemas["HeroCopy"] | undefined {
+const MISSING: Message = { key: "experiments.form.heroMissing", params: {} };
+
+export function heroCopy(fields: Record<string, HeroFields>, locales: string[]): HeroInput {
   const copy: Schemas["HeroCopy"] = {};
-  for (const [locale, texts] of Object.entries(fields))
-    for (const field of HERO_FIELDS) {
-      const text = texts[field].trim();
-      if (text) copy[field] = { ...copy[field], [locale]: text };
-    }
-  return Object.keys(copy).length > 0 ? copy : undefined;
+  const missing: Record<string, Partial<Record<HeroField, Message>>> = {};
+  for (const field of HERO_FIELDS) {
+    const texts = locales.map((l) => [l, fields[l]?.[field].trim() ?? ""] as const);
+    const filled = texts.filter(([, text]) => text);
+    if (filled.length === 0) continue;
+    copy[field] = Object.fromEntries(filled);
+    for (const [l, text] of texts) if (!text) missing[l] = { ...missing[l], [field]: MISSING };
+  }
+  if (Object.keys(missing).length > 0) return { missing };
+  return { copy: Object.keys(copy).length > 0 ? copy : undefined };
 }

@@ -485,7 +485,7 @@ async fn admins_create_read_stop_and_promote_an_experiment(db: PgPool) {
     let admin = |call| as_owner(call, &owner, shop.tenant);
     let input = json!({
         "name": "homepage",
-        "change": {"kind": "hero", "hero": {"title": {"cs": "Nová kolekce"}}},
+        "change": {"kind": "hero", "hero": {"title": {"cs": "Nová kolekce", "sk": "Nová kolekcia"}}},
     });
 
     let (status, created, res) = admin(Call::post(EXPERIMENTS, input.clone()).key("exp-1"))
@@ -519,7 +519,7 @@ async fn admins_create_read_stop_and_promote_an_experiment(db: PgPool) {
             &json!("homepage"),
             &json!(1),
             &json!("draft"),
-            &json!({"kind": "hero", "hero": {"title": {"cs": "Nová kolekce"}}})
+            &json!({"kind": "hero", "hero": {"title": {"cs": "Nová kolekce", "sk": "Nová kolekcia"}}})
         )
     );
     let (status, replayed, res) = admin(Call::post(EXPERIMENTS, input).key("exp-1"))
