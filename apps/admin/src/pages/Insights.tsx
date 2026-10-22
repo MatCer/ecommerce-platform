@@ -16,6 +16,9 @@ const day = (iso: string) =>
     new Date(`${iso}T00:00:00Z`),
   );
 
+const visits = (score: number) =>
+  new Intl.NumberFormat(locale()).format(Math.max(1, Math.round(score)));
+
 function Heading(props: { insight: Insight }) {
   const content = (): JSX.Element => {
     const d = props.insight.detection;
@@ -37,6 +40,8 @@ function Heading(props: { insight: Insight }) {
           t("insights.deletedProduct")
         );
       }
+      case "zero_result_search":
+        return t("insights.searchHeading", { query: d.query });
     }
   };
   return <>{content()}</>;
@@ -84,13 +89,7 @@ function InsightCard(props: {
           {t(`insights.${d().kind}`, detectionParams(d(), locale()))}
         </p>
         <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span class="figures">
-            {t("insights.affected", {
-              n: new Intl.NumberFormat(locale()).format(
-                Math.max(1, Math.round(props.insight.score)),
-              ),
-            })}
-          </span>
+          <span class="figures">{t("insights.affected", { n: visits(props.insight.score) })}</span>
           <Show
             when={props.insight.status === "resolved"}
             fallback={
@@ -99,6 +98,19 @@ function InsightCard(props: {
           >
             <Badge>{t("insights.resolved")}</Badge>
             <span>{t("insights.lastDetected", { date: day(props.insight.last_detected_on) })}</span>
+          </Show>
+          <Show when={props.insight.status === "open" && props.insight.reopened}>
+            {(r) => (
+              <>
+                <Badge tone="warning">{t("insights.reopened")}</Badge>
+                <span>
+                  {t("insights.reopenedDetail", {
+                    date: day(r().on),
+                    n: visits(r().dismissed_score),
+                  })}
+                </span>
+              </>
+            )}
           </Show>
         </p>
         <Show when={props.insight.hypothesis}>
@@ -120,8 +132,9 @@ function InsightCard(props: {
                   {h().theme_prompt}
                 </blockquote>
               </figure>
-              <p class="text-xs text-muted-foreground">
-                {t("insights.model", { model: h().model })}
+              <p class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>{t("insights.written", { date: day(h().generated_at.slice(0, 10)) })}</span>
+                <span>{t("insights.model", { model: h().model })}</span>
               </p>
             </section>
           )}

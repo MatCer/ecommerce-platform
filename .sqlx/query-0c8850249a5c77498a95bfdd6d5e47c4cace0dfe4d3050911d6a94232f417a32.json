@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.status, s.detection, s.score, s.first_detected_on, s.last_detected_on,\n                  s.hypothesis, s.theme_prompt, s.hypothesis_model, s.hypothesis_at,\n                  CASE WHEN s.kind = 'low_add_to_cart'\n                       THEN insight_product_name((s.detection->>'product_id')::uuid) END\n                      AS product_name,\n                  p.id AS \"revision_id?\", p.number AS \"revision_number?\",\n                  p.published_at AS \"published_at?\"\n           FROM insight_signals s\n           LEFT JOIN LATERAL (\n               SELECT v.id, v.number, v.published_at\n               FROM ai_theme_runs r JOIN theme_revisions v ON v.id = r.revision_id\n               WHERE r.insight_id = s.id AND v.published_at IS NOT NULL\n               ORDER BY v.published_at DESC LIMIT 1\n           ) p ON true\n           WHERE CASE WHEN $1::uuid IS NULL\n                      THEN s.status = 'open' OR (s.status = 'resolved' AND p.id IS NOT NULL)\n                      ELSE s.id = $1 END\n           ORDER BY s.score DESC, s.kind COLLATE \"C\", s.subject COLLATE \"C\" LIMIT $2",
+  "query": "SELECT s.id, s.status, s.detection, s.score, s.first_detected_on, s.last_detected_on,\n                  s.hypothesis, s.theme_prompt, s.hypothesis_model, s.hypothesis_at,\n                  s.dismissed_score, s.reopened_on,\n                  CASE WHEN s.kind = 'low_add_to_cart'\n                       THEN insight_product_name((s.detection->>'product_id')::uuid) END\n                      AS product_name,\n                  p.id AS \"revision_id?\", p.number AS \"revision_number?\",\n                  p.published_at AS \"published_at?\"\n           FROM insight_signals s\n           LEFT JOIN LATERAL (\n               SELECT v.id, v.number, v.published_at\n               FROM ai_theme_runs r JOIN theme_revisions v ON v.id = r.revision_id\n               WHERE r.insight_id = s.id AND v.published_at IS NOT NULL\n               ORDER BY v.published_at DESC LIMIT 1\n           ) p ON true\n           WHERE CASE WHEN $1::uuid IS NULL\n                      THEN s.status = 'open' OR (s.status = 'resolved' AND p.id IS NOT NULL)\n                      ELSE s.id = $1 END\n           ORDER BY s.score DESC, s.kind COLLATE \"C\", s.subject COLLATE \"C\" LIMIT $2",
   "describe": {
     "columns": [
       {
@@ -115,12 +115,34 @@
       },
       {
         "ordinal": 10,
+        "name": "dismissed_score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "dismissed_score"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "reopened_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "reopened_on"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
         "name": "product_name",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "revision_id?",
         "type_info": "Uuid",
         "origin": {
@@ -131,7 +153,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 14,
         "name": "revision_number?",
         "type_info": "Int4",
         "origin": {
@@ -142,7 +164,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 15,
         "name": "published_at?",
         "type_info": "Timestamptz",
         "origin": {
@@ -170,11 +192,13 @@
       true,
       true,
       true,
+      true,
+      true,
       null,
       false,
       false,
       true
     ]
   },
-  "hash": "0eed7e9c1d19aec081d6706b299cb6287c9c968478afcac74099ef3b9357515f"
+  "hash": "0c8850249a5c77498a95bfdd6d5e47c4cace0dfe4d3050911d6a94232f417a32"
 }

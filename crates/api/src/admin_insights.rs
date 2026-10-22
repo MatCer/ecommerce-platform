@@ -48,7 +48,8 @@ async fn list_insights(
     Ok(Json(InsightList { items }))
 }
 
-/// Hides a signal for good, also when it is detected again. Idempotent.
+/// Hides a signal until a run detects it with at least 1.5 times its score at dismissal, which
+/// reopens it. Idempotent.
 #[utoipa::path(
     post,
     path = "/admin/v1/insights/{id}/dismiss",

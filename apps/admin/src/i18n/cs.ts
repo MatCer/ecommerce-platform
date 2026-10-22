@@ -251,7 +251,7 @@ export const cs: Dictionary = {
       "Produkty s alespoň 5 zveřejněnými ověřenými recenzemi dostanou na stránce produktu krátké shrnutí od AI, v jazyce každého trhu a označené jako vytvořené umělou inteligencí. Každé shrnutí spotřebuje tokeny AI.",
     insights: "Hypotézy k postřehům",
     insightsDesc:
-      "AI každou noc napíše u nejvýše 3 nových postřehů možnou příčinu a návrh zadání pro AI úpravy vzhledu, označené jako vytvořené umělou inteligencí. Objeví se po dalším nočním běhu, ne hned. Samotné postřehy se vyhledávají tak jako tak. Každá hypotéza spotřebuje tokeny AI.",
+      "AI každou noc napíše u nejvýše 3 postřehů možnou příčinu a návrh zadání pro AI úpravy vzhledu, označené jako vytvořené umělou inteligencí: u nových postřehů a znovu u těch, jejichž ovlivněné návštěvy od napsání hypotézy vzrostly o polovinu nebo klesly o třetinu. Objeví se po dalším nočním běhu, ne hned. Samotné postřehy se vyhledávají tak jako tak. Každá hypotéza spotřebuje tokeny AI.",
     adminOnly: "Tato nastavení mohou měnit jen vlastníci a správci.",
     altTexts: "Alternativní texty nových obrázků produktů",
     altTextsDesc:
@@ -2387,16 +2387,20 @@ export const cs: Dictionary = {
     list: "Postřehy",
     empty: "Za posledních 14 dní nic nevybočuje.",
     emptyHint:
-      "Postřehy potřebují dost návštěvnosti: 100 relací týdně pro krok nákupu, 200 zobrazení pro produkt a 50 měření rychlosti pro typ stránky.",
+      "Postřehy potřebují dost návštěvnosti: 100 relací týdně pro krok nákupu, 200 zobrazení pro produkt, 50 měření rychlosti pro typ stránky a 10 hledání bez výsledků pro jeden hledaný výraz za 14 dní.",
     affected: "Ovlivněné návštěvy: ~{{n}} týdně",
     since: "Zjištěno od {{date}}",
     resolved: "Už se neprojevuje",
     lastDetected: "Naposledy zjištěno {{date}}",
     deletedProduct: "Smazaný produkt",
+    searchHeading: "Hledání „{{query}}“",
+    reopened: "Znovu zobrazeno",
+    reopenedDetail: "Zpět od {{date}}, při skrytí ~{{n}} týdně",
     slowHeading: "{{template}}: {{metric}}",
     hypothesis: "Možná příčina",
     draft: "Návrh zadání pro AI úpravy vzhledu",
     model: "Model: {{model}}",
+    written: "Napsáno {{date}}",
     dismiss: "Skrýt",
     dismissed: "Postřeh skryt",
     openInEditor: "Otevřít v AI úpravách vzhledu",
@@ -2410,6 +2414,7 @@ export const cs: Dictionary = {
       funnel_drop: "{{value}} z {{samples}} relací",
       low_add_to_cart: "{{value}} z {{samples}} zobrazení",
       slow_page: "p75 {{value}} z {{samples}} měření",
+      zero_result_search: "Hledání bez výsledků: {{value}}",
     },
     transitions: {
       sessions_to_view_item: "Návštěvy, které dojdou k produktu",
@@ -2423,5 +2428,7 @@ export const cs: Dictionary = {
       "Do košíku se přidává u {{rate}} zobrazení za posledních 14 dní, v celém obchodě u {{shopRate}} ({{adds}} z {{views}} zobrazení).",
     slow_page:
       "{{metric}} p75 je {{p75}}, nad hranicí dobrého výsledku {{bound}} ({{samples}} měření za posledních 14 dní).",
+    zero_result_search:
+      "{{searches}} hledání za posledních 14 dní nenašlo žádný produkt (všechny jazyky dohromady).",
   },
 };

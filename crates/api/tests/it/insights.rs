@@ -72,6 +72,7 @@ async fn staff_list_and_dismiss_their_shops_insights(db: PgPool) {
         "last_detected_on": day,
         "hypothesis": null,
         "theme_change": null,
+        "reopened": null,
     });
     assert_eq!(body, json!({ "items": [insight.clone()] }));
 

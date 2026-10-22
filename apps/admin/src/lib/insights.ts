@@ -30,6 +30,8 @@ export function detectionParams(d: Detection, locale: string): Record<string, st
         bound: formatVital(d.metric, THRESHOLDS[d.metric]?.[0] ?? 0, locale),
         samples: num(d.samples),
       };
+    case "zero_result_search":
+      return { searches: num(d.searches) };
   }
 }
 
@@ -46,6 +48,8 @@ export function measureText(
   const value =
     d.kind === "slow_page"
       ? formatVital(d.metric, m.value, locale)
-      : formatPercent(m.value, locale);
+      : d.kind === "zero_result_search"
+        ? formatNumber(m.value, locale)
+        : formatPercent(m.value, locale);
   return t(`insights.change.${d.kind}`, { value, samples: formatNumber(m.samples, locale) });
 }

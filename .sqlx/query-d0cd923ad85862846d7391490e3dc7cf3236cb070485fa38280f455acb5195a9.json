@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO insight_scores (tenant_id, signal_id, day, score)\n             SELECT tenant_id, id, $3, $4 FROM insight_signals WHERE kind = $1 AND subject = $2\n             ON CONFLICT (tenant_id, signal_id, day) DO UPDATE SET score = EXCLUDED.score",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Date",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d0cd923ad85862846d7391490e3dc7cf3236cb070485fa38280f455acb5195a9"
+}

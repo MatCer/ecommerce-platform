@@ -15,7 +15,9 @@ use uuid::Uuid;
 use crate::ai::{self, Ai, Call, CallError, Outcome, prompts, settings};
 use crate::{analytics, audit};
 use detect::Detection;
-use detect::rules::{FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS};
+use detect::rules::{
+    FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS, ZERO_RESULT_DAYS,
+};
 pub use readout::{Measure, ThemeChange, Window};
 
 pub const JOB: &str = "insights.run";
@@ -24,6 +26,7 @@ pub const EARLIEST_RUN_HOUR_UTC: i64 = 4;
 pub const LIST_LIMIT: i64 = 50;
 pub const HYPOTHESIS_MAX: usize = 500;
 pub const THEME_PROMPT_MAX: usize = 1500;
+pub const MOVE_FACTOR: f64 = 1.5;
 const ACTOR: &str = "system";
 
 /// The run of one tenant over `day` (the payload carries it, so a late or retried job still
@@ -55,6 +58,17 @@ pub struct Insight {
     pub hypothesis: Option<Hypothesis>,
     /// The latest theme change published from this insight's draft (`null` when none).
     pub theme_change: Option<ThemeChange>,
+    /// Set when a dismissed signal came back with at least 1.5 times its score at dismissal.
+    pub reopened: Option<Reopened>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, ToSchema)]
+#[schema(as = InsightReopened)]
+pub struct Reopened {
+    /// The run day that reopened it.
+    pub on: NaiveDate,
+    /// The score when staff dismissed it.
+    pub dismissed_score: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -87,6 +101,8 @@ struct Row {
     theme_prompt: Option<String>,
     hypothesis_model: Option<String>,
     hypothesis_at: Option<DateTime<Utc>>,
+    dismissed_score: Option<f64>,
+    reopened_on: Option<NaiveDate>,
     revision_id: Option<Uuid>,
     revision_number: Option<i32>,
     published_at: Option<DateTime<Utc>>,
@@ -123,6 +139,18 @@ impl TryFrom<Row> for Insight {
             }),
             _ => None,
         };
+        let reopened = match (r.reopened_on, r.dismissed_score) {
+            (Some(on), Some(dismissed_score)) => Some(Reopened {
+                on,
+                dismissed_score,
+            }),
+            (Some(_), None) => {
+                return Err(Error::Internal(
+                    "reopened insight without a dismissal score".into(),
+                ));
+            }
+            (None, _) => None,
+        };
         Ok(Self {
             id: r.id,
             status: parse_status(&r.status)?,
@@ -133,6 +161,7 @@ impl TryFrom<Row> for Insight {
             last_detected_on: r.last_detected_on,
             hypothesis,
             theme_change: None,
+            reopened,
         })
     }
 }
@@ -150,6 +179,7 @@ async fn select(
         Row,
         r#"SELECT s.id, s.status, s.detection, s.score, s.first_detected_on, s.last_detected_on,
                   s.hypothesis, s.theme_prompt, s.hypothesis_model, s.hypothesis_at,
+                  s.dismissed_score, s.reopened_on,
                   CASE WHEN s.kind = 'low_add_to_cart'
                        THEN insight_product_name((s.detection->>'product_id')::uuid) END
                       AS product_name,
@@ -200,7 +230,8 @@ pub async fn dismiss(
     today: NaiveDate,
 ) -> Result<Insight, Error> {
     let changed = sqlx::query!(
-        "UPDATE insight_signals SET status = 'dismissed', dismissed_at = now(), dismissed_by = $2
+        "UPDATE insight_signals SET status = 'dismissed', dismissed_at = now(), dismissed_by = $2,
+                                    dismissed_score = score, reopened_on = NULL
          WHERE id = $1 AND status <> 'dismissed' RETURNING kind, subject",
         id,
         actor
@@ -263,6 +294,31 @@ async fn store(tx: &mut TenantTx, day: NaiveDate, found: &[Detection]) -> Result
     for d in found {
         let detection =
             serde_json::to_value(d).map_err(|e| Error::Internal(format!("detection: {e}")))?;
+        let reopened = sqlx::query!(
+            r#"UPDATE insight_signals SET status = 'open', reopened_on = $3
+               WHERE kind = $1 AND subject = $2 AND status = 'dismissed'
+                 AND $4 >= $5 * dismissed_score AND $3 >= last_detected_on
+               RETURNING id, dismissed_score AS "dismissed_score!""#,
+            d.kind(),
+            d.subject(),
+            day,
+            d.score(),
+            MOVE_FACTOR
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if let Some(r) = reopened {
+            audit::record(
+                tx,
+                ACTOR,
+                "insight.reopened",
+                "insight_signal",
+                Some(&r.id.to_string()),
+                &json!({ "kind": d.kind(), "subject": d.subject(), "score": d.score(),
+                         "dismissed_score": r.dismissed_score }),
+            )
+            .await?;
+        }
         sqlx::query!(
             "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score,
                                           first_detected_on, last_detected_on)
@@ -283,6 +339,17 @@ async fn store(tx: &mut TenantTx, day: NaiveDate, found: &[Detection]) -> Result
         )
         .execute(&mut **tx)
         .await?;
+        sqlx::query!(
+            "INSERT INTO insight_scores (tenant_id, signal_id, day, score)
+             SELECT tenant_id, id, $3, $4 FROM insight_signals WHERE kind = $1 AND subject = $2
+             ON CONFLICT (tenant_id, signal_id, day) DO UPDATE SET score = EXCLUDED.score",
+            d.kind(),
+            d.subject(),
+            day,
+            d.score()
+        )
+        .execute(&mut **tx)
+        .await?;
     }
     sqlx::query!(
         "UPDATE insight_signals SET status = 'resolved'
@@ -298,6 +365,8 @@ struct Target {
     id: Uuid,
     detection: Value,
     product_name: Option<String>,
+    score: f64,
+    seen: Option<f64>,
 }
 
 fn facts(d: &Detection, product: Option<&str>, locale: &str) -> Value {
@@ -344,6 +413,11 @@ fn facts(d: &Detection, product: Option<&str>, locale: &str) -> Value {
             "samples": samples,
             "page_requests": requests,
             "days": VITALS_DAYS,
+        }),
+        Detection::ZeroResultSearch { query, searches } => json!({
+            "query": query,
+            "searches_without_results": searches,
+            "days": ZERO_RESULT_DAYS,
         }),
     };
     v["kind"] = json!(d.kind());
@@ -436,10 +510,15 @@ async fn run_locked(
         r#"SELECT id, detection,
                   CASE WHEN kind = 'low_add_to_cart'
                        THEN insight_product_name((detection->>'product_id')::uuid) END
-                      AS product_name
-           FROM insight_signals WHERE status = 'open' AND hypothesis_at IS NULL
+                      AS product_name,
+                  score, hypothesis_score AS seen
+           FROM insight_signals
+           WHERE status = 'open'
+             AND (hypothesis_score IS NULL OR score >= $2 * hypothesis_score
+                  OR score * $2 <= hypothesis_score)
            ORDER BY score DESC, kind COLLATE "C", subject COLLATE "C" LIMIT $1"#,
-        DAILY_MODEL_CALLS
+        DAILY_MODEL_CALLS,
+        MOVE_FACTOR
     )
     .fetch_all(&mut *tx)
     .await?;
@@ -482,12 +561,15 @@ async fn run_locked(
             Ok(((text, prompt), model)) => {
                 sqlx::query!(
                     "UPDATE insight_signals SET hypothesis = $2, theme_prompt = $3,
-                            hypothesis_model = $4, hypothesis_at = now()
-                     WHERE id = $1 AND hypothesis_at IS NULL",
+                            hypothesis_model = $4, hypothesis_error = NULL, hypothesis_at = now(),
+                            hypothesis_score = $5
+                     WHERE id = $1 AND hypothesis_score IS NOT DISTINCT FROM $6",
                     t.id,
                     text,
                     prompt,
-                    model
+                    model,
+                    t.score,
+                    t.seen
                 )
                 .execute(&mut *tx)
                 .await?;
@@ -502,10 +584,16 @@ async fn run_locked(
             Err(e) => {
                 tracing::warn!(%tenant, signal = %t.id, code = e.code(), "insight hypothesis rejected");
                 sqlx::query!(
-                    "UPDATE insight_signals SET hypothesis_error = $2, hypothesis_at = now()
-                     WHERE id = $1 AND hypothesis_at IS NULL",
+                    "UPDATE insight_signals
+                     SET hypothesis_error = CASE WHEN hypothesis IS NULL THEN $2 END,
+                         hypothesis_at = CASE WHEN hypothesis IS NULL THEN now()
+                                              ELSE hypothesis_at END,
+                         hypothesis_score = $3
+                     WHERE id = $1 AND hypothesis_score IS NOT DISTINCT FROM $4",
                     t.id,
-                    e.code()
+                    e.code(),
+                    t.score,
+                    t.seen
                 )
                 .execute(&mut *tx)
                 .await?;

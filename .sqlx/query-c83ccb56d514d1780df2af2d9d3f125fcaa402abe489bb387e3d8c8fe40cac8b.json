@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT query, sum(count)::bigint AS \"searches!\" FROM search_zero_results\n           WHERE day BETWEEN $1 AND $2 GROUP BY query",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "query",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_zero_results",
+            "name": "query"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "searches!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "c83ccb56d514d1780df2af2d9d3f125fcaa402abe489bb387e3d8c8fe40cac8b"
+}

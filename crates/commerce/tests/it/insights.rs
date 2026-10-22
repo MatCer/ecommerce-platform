@@ -5,7 +5,7 @@ use chrono::{Days, NaiveDate, Utc};
 use commerce::ai::settings::{self, AiSettingsChange};
 use commerce::ai::{Ai, Outcome};
 use commerce::insights::detect::{Detection, Pair, Transition, Vital};
-use commerce::insights::{self, Insight, Measure, Status, ThemeChange, Window};
+use commerce::insights::{self, Insight, Measure, Reopened, Status, ThemeChange, Window};
 use commerce::themes::{self, RevisionSummary};
 use platform::ai::{Client, Fake};
 use platform::db::tenant_tx;
@@ -312,6 +312,50 @@ async fn detects_ranks_and_lists_signals_idempotently(db: PgPool) {
     assert_eq!(usage(&runtime, &shop).await, 0, "the switch is off");
 }
 
+async fn scores(runtime: &PgPool, tenant: Uuid) -> Vec<(String, NaiveDate, f64)> {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query_as(
+        "SELECT s.subject, h.day, h.score FROM insight_scores h
+         JOIN insight_signals s ON s.id = h.signal_id ORDER BY s.subject, h.day",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn each_run_keeps_the_days_score_and_a_rerun_overwrites_it(db: PgPool) {
+    let (runtime, shop) = setup(&db, "hist").await;
+    let day = yesterday();
+    let before = day - Days::new(1);
+    vitals(&runtime, &shop, before, ("home", "LCP", 5000.0, 60, 2000)).await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    assert_eq!(
+        scores(&runtime, shop.tenant).await,
+        vec![
+            ("home:LCP".into(), before, 50.0),
+            ("home:LCP".into(), day, 50.0)
+        ]
+    );
+
+    vitals(&runtime, &shop, day, ("home", "LCP", 5000.0, 60, 2000)).await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    assert_eq!(
+        scores(&runtime, shop.tenant).await,
+        vec![
+            ("home:LCP".into(), before, 50.0),
+            ("home:LCP".into(), day, 100.0)
+        ]
+    );
+    assert_eq!(
+        ranked(&runtime, shop.tenant).await,
+        vec![row("slow_page", "home:LCP", 100.0, None, before, day)],
+        "a late run of an older day keeps the newer score"
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_run_rolls_up_its_day_before_detecting(db: PgPool) {
     let (runtime, shop) = setup(&db, "roll").await;
@@ -429,6 +473,74 @@ async fn dismissed_stays_dismissed_and_gone_signals_resolve_and_reopen(db: PgPoo
     );
 }
 
+async fn reopens(runtime: &PgPool, shop: &Shop, id: Uuid) -> Vec<String> {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    sqlx::query_scalar(
+        "SELECT actor FROM audit_log WHERE action = 'insight.reopened' AND entity_id = $1",
+    )
+    .bind(id.to_string())
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap()
+}
+
+async fn dismiss(runtime: &PgPool, shop: &Shop, id: Uuid) -> Insight {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    let dismissed = insights::dismiss(&mut tx, "clerk", id, Utc::now().date_naive())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    dismissed
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_dismissed_signal_reopens_at_one_and_a_half_times_its_dismissal_score(db: PgPool) {
+    let (runtime, shop) = setup(&db, "reopen").await;
+    let d = |n: u64| yesterday() - Days::new(6) + Days::new(n);
+    let requests = async |n: u64, requests: i64| {
+        vitals(&runtime, &shop, d(n), ("home", "LCP", 5000.0, 60, requests)).await;
+        run(&runtime, &Ai::fake(), &shop, d(n)).await;
+    };
+    let listed = async || -> Vec<(Uuid, f64, Option<Reopened>)> {
+        list(&runtime, shop.tenant)
+            .await
+            .into_iter()
+            .map(|i| (i.id, i.score, i.reopened))
+            .collect()
+    };
+
+    requests(0, 2000).await;
+    let id = list(&runtime, shop.tenant).await[0].id;
+    dismiss(&runtime, &shop, id).await;
+    requests(1, 999).await;
+    assert_eq!(listed().await, vec![], "74.975 is below 1.5 times 50");
+
+    requests(2, 1).await;
+    let first = Some(Reopened {
+        on: d(2),
+        dismissed_score: 50.0,
+    });
+    assert_eq!(listed().await, vec![(id, 75.0, first)]);
+    assert_eq!(reopens(&runtime, &shop, id).await, vec!["system"]);
+
+    run(&runtime, &Ai::fake(), &shop, d(2)).await;
+    requests(3, 1000).await;
+    assert_eq!(listed().await, vec![(id, 100.0, first)]);
+    assert_eq!(reopens(&runtime, &shop, id).await, vec!["system"]);
+
+    let again = dismiss(&runtime, &shop, id).await;
+    assert_eq!((again.status, again.reopened), (Status::Dismissed, None));
+    requests(4, 1999).await;
+    assert_eq!(listed().await, vec![], "149.975 is below 1.5 times 100");
+    requests(5, 1).await;
+    let second = Some(Reopened {
+        on: d(5),
+        dismissed_score: 100.0,
+    });
+    assert_eq!(listed().await, vec![(id, 150.0, second)]);
+    assert_eq!(reopens(&runtime, &shop, id).await, vec!["system", "system"]);
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn another_tenant_cannot_list_or_dismiss_signals(db: PgPool) {
     let (runtime, a) = setup(&db, "ta").await;
@@ -530,7 +642,7 @@ async fn calls_whose_results_were_lost_still_count_toward_the_daily_cap(db: PgPo
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query(
         "UPDATE insight_signals SET hypothesis = NULL, theme_prompt = NULL,
-                hypothesis_model = NULL, hypothesis_at = NULL",
+                hypothesis_model = NULL, hypothesis_at = NULL, hypothesis_score = NULL",
     )
     .execute(&mut *tx)
     .await
@@ -582,6 +694,18 @@ async fn a_run_while_another_holds_the_tenant_does_nothing(db: PgPool) {
     assert_eq!(usage(&runtime, &shop).await, 3);
 }
 
+async fn move_usage_back_a_day(db: &PgPool) {
+    let mut owner = db.begin().await.unwrap();
+    for sql in [
+        "ALTER TABLE ai_usage NO FORCE ROW LEVEL SECURITY",
+        "UPDATE ai_usage SET at = at - interval '1 day'",
+        "ALTER TABLE ai_usage FORCE ROW LEVEL SECURITY",
+    ] {
+        sqlx::query(sql).execute(&mut *owner).await.unwrap();
+    }
+    owner.commit().await.unwrap();
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn rejected_output_is_recorded_and_never_retried(db: PgPool) {
     let (runtime, shop) = setup(&db, "bad").await;
@@ -601,15 +725,7 @@ async fn rejected_output_is_recorded_and_never_retried(db: PgPool) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    let mut owner = db.begin().await.unwrap();
-    for sql in [
-        "ALTER TABLE ai_usage NO FORCE ROW LEVEL SECURITY",
-        "UPDATE ai_usage SET at = at - interval '1 day'",
-        "ALTER TABLE ai_usage FORCE ROW LEVEL SECURITY",
-    ] {
-        sqlx::query(sql).execute(&mut *owner).await.unwrap();
-    }
-    owner.commit().await.unwrap();
+    move_usage_back_a_day(&db).await;
     run(&runtime, &Ai::fake(), &shop, day + Days::new(1)).await;
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
@@ -634,6 +750,135 @@ async fn rejected_output_is_recorded_and_never_retried(db: PgPool) {
         usage(&runtime, &shop).await,
         4,
         "rejected calls are metered"
+    );
+}
+
+fn searched(query: &str, times: i64) -> String {
+    format!("Demo AI: shoppers searched for {query} {times} times in 14 days and found nothing.")
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_hypothesis_is_rewritten_when_the_score_moves_by_half_either_way(db: PgPool) {
+    let (runtime, shop) = setup(&db, "stale").await;
+    switch(&runtime, &shop, true).await;
+    let d = |n: u64| yesterday() - Days::new(14) + Days::new(n);
+    let searches = async |n: u64, count: i32| {
+        zero_results(&runtime, &shop, &[(d(n), "cs", "modre tricko", count)]).await;
+        run(&runtime, &Ai::fake(), &shop, d(n)).await;
+        let i = list(&runtime, shop.tenant).await.remove(0);
+        (i.score, i.hypothesis.unwrap(), usage(&runtime, &shop).await)
+    };
+
+    let (score, first, calls) = searches(0, 20).await;
+    assert_eq!(
+        (score, first.text.as_str(), calls),
+        (10.0, searched("modre tricko", 20).as_str(), 1)
+    );
+
+    let (score, kept, calls) = searches(1, 9).await;
+    assert_eq!(
+        (score, &kept, calls),
+        (14.5, &first, 1),
+        "14.5 is below 1.5 times 10"
+    );
+
+    let (score, up, calls) = searches(2, 1).await;
+    assert_eq!(
+        (score, up.text.as_str(), calls),
+        (15.0, searched("modre tricko", 30).as_str(), 2)
+    );
+    assert!(up.generated_at > first.generated_at);
+
+    let (score, down, calls) = searches(14, 10).await;
+    assert_eq!(
+        (score, down.text.as_str(), calls),
+        (10.0, searched("modre tricko", 20).as_str(), 3),
+        "10 is 15 divided by 1.5"
+    );
+    assert!(down.generated_at > up.generated_at);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn new_and_stale_signals_share_the_three_calls_by_score(db: PgPool) {
+    let (runtime, shop) = setup(&db, "share").await;
+    switch(&runtime, &shop, true).await;
+    let day = yesterday();
+    let before = day - Days::new(1);
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (before, "cs", "steady", 40),
+            (before, "cs", "risen", 30),
+            (before, "cs", "climbed", 20),
+            (before, "cs", "waiting", 12),
+        ],
+    )
+    .await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    move_usage_back_a_day(&db).await;
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (day, "cs", "steady", 10),
+            (day, "cs", "risen", 16),
+            (day, "cs", "climbed", 12),
+            (day, "cs", "new", 40),
+        ],
+    )
+    .await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+
+    let got: Vec<(String, f64, Option<String>)> = list(&runtime, shop.tenant)
+        .await
+        .into_iter()
+        .map(|i| (i.detection.subject(), i.score, i.hypothesis.map(|h| h.text)))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            ("steady".into(), 25.0, Some(searched("steady", 40))),
+            ("risen".into(), 23.0, Some(searched("risen", 46))),
+            ("new".into(), 20.0, Some(searched("new", 40))),
+            ("climbed".into(), 16.0, Some(searched("climbed", 32))),
+            ("waiting".into(), 6.0, None),
+        ]
+    );
+    assert_eq!(usage(&runtime, &shop).await, 6, "three calls on each day");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_rejected_regeneration_keeps_the_text_and_date(db: PgPool) {
+    let (runtime, shop) = setup(&db, "keep").await;
+    switch(&runtime, &shop, true).await;
+    let day = yesterday();
+    let before = day - Days::new(1);
+    zero_results(&runtime, &shop, &[(before, "cs", "modre tricko", 20)]).await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    let first = list(&runtime, shop.tenant).await.remove(0).hypothesis;
+    assert!(first.is_some());
+
+    zero_results(&runtime, &shop, &[(day, "cs", "modre tricko", 10)]).await;
+    let fake = Fake::new([(
+        "insight_hypothesis",
+        r#"{"hypothesis": "See https://evil.example", "theme_prompt": "Make the search page more helpful."}"#,
+    )])
+    .unwrap();
+    let scripted = Ai::fake_with_client(Some(Client::Fake(Arc::new(fake))));
+    run(&runtime, &scripted, &shop, day).await;
+    let shown = async || {
+        let i = list(&runtime, shop.tenant).await.remove(0);
+        (i.score, i.hypothesis, usage(&runtime, &shop).await)
+    };
+    assert_eq!(shown().await, (15.0, first.clone(), 2));
+
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    assert_eq!(
+        shown().await,
+        (15.0, first, 2),
+        "the rejected score is not retried"
     );
 }
 
@@ -705,6 +950,17 @@ async fn the_model_sees_only_aggregates_in_the_shop_language(db: PgPool) {
         .hypothesis
         .clone()
         .unwrap();
+    let searching = testkit::storefront::shop(&runtime, "agg-search").await;
+    switch(&runtime, &searching, true).await;
+    zero_results(&runtime, &searching, &[(day, "sk", "modre tricko", 10)]).await;
+    run(&runtime, &ai, &searching, day).await;
+    let search_call = seen.lock().unwrap()[3]["messages"][0]["content"].to_string();
+    for fact in [
+        r#"\"query\":\"modre tricko\""#,
+        r#"\"searches_without_results\":10"#,
+    ] {
+        assert!(search_call.contains(fact), "{search_call}");
+    }
     assert_eq!(
         (
             hyp.text.as_str(),
@@ -968,6 +1224,111 @@ async fn product_and_slow_page_insights_read_out_their_own_metric(db: PgPool) {
     assert_eq!(
         change(&runtime, &shop, slow, days(d, 15)).await,
         readout(&rev, measure(Some(3500.0), 40), measure(Some(2000.0), 10))
+    );
+}
+
+async fn zero_results(runtime: &PgPool, shop: &Shop, rows: &[(NaiveDate, &str, &str, i32)]) {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    for (day, locale, query, count) in rows {
+        sqlx::query(
+            "INSERT INTO search_zero_results (tenant_id, day, locale, query, count)
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(shop.tenant)
+        .bind(day)
+        .bind(locale)
+        .bind(query)
+        .bind(count)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn zero_result_searches_become_a_signal_with_a_before_after_readout(db: PgPool) {
+    let (runtime, shop) = setup(&db, "zero").await;
+    let day = yesterday() - Days::new(30);
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (days(day, -14), "cs", "modre tricko", 50),
+            (days(day, -13), "cs", "modre tricko", 6),
+            (day, "sk", "modre tricko", 4),
+            (day, "cs", "cervene saty", 9),
+        ],
+    )
+    .await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    let found = list(&runtime, shop.tenant).await;
+    assert_eq!(
+        found
+            .iter()
+            .map(|i| (&i.detection, i.score))
+            .collect::<Vec<_>>(),
+        vec![(
+            &Detection::ZeroResultSearch {
+                query: "modre tricko".into(),
+                searches: 10
+            },
+            5.0
+        )]
+    );
+
+    let rev = publish_from(&runtime, &shop, Some(found[0].id)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (days(d, -15), "cs", "modre tricko", 90),
+            (days(d, -14), "cs", "modre tricko", 3),
+            (days(d, -1), "sk", "modre tricko", 4),
+            (days(d, -5), "cs", "cervene saty", 20),
+            (d, "cs", "modre tricko", 100),
+            (days(d, 15), "cs", "modre tricko", 90),
+        ],
+    )
+    .await;
+    assert_eq!(
+        change(&runtime, &shop, found[0].id, days(d, 15)).await,
+        readout(&rev, measure(Some(7.0), 7), measure(Some(0.0), 0)),
+        "no search without results after the change is a real zero"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_zero_result_window_past_the_logs_retention_has_no_data(db: PgPool) {
+    let (runtime, shop) = setup(&db, "expired").await;
+    let query = Detection::ZeroResultSearch {
+        query: "modre tricko".into(),
+        searches: 10,
+    };
+    let insight = signal(&runtime, &shop, &query, "open").await;
+    let rev = publish_from(&runtime, &shop, Some(insight)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (days(d, -14), "cs", "modre tricko", 3),
+            (days(d, -1), "sk", "modre tricko", 4),
+            (days(d, 1), "cs", "modre tricko", 5),
+        ],
+    )
+    .await;
+    let after = measure(Some(5.0), 5);
+    assert_eq!(
+        change(&runtime, &shop, insight, days(d, 76)).await,
+        readout(&rev, measure(Some(7.0), 7), after),
+        "the before window starts 90 days ago, so the log still holds it"
+    );
+    assert_eq!(
+        change(&runtime, &shop, insight, days(d, 77)).await,
+        readout(&rev, measure(None, 0), after),
+        "the log has dropped the before window's first day"
     );
 }
 

@@ -4,7 +4,9 @@ use platform::db::TenantTx;
 
 use crate::analytics::{FUNNEL_METRICS, day_bounds, web_vitals_p75};
 
-use super::detect::rules::{FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS};
+use super::detect::rules::{
+    FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS, ZERO_RESULT_DAYS,
+};
 use super::detect::{Metrics, Vital, VitalStat};
 
 fn window_start(day: NaiveDate, days: u64) -> NaiveDate {
@@ -80,6 +82,18 @@ pub(super) async fn metrics(tx: &mut TenantTx, day: NaiveDate) -> Result<Metrics
     .await?
     .into_iter()
     .map(|r| (r.template, r.requests))
+    .collect();
+
+    m.zero_results = sqlx::query!(
+        r#"SELECT query, sum(count)::bigint AS "searches!" FROM search_zero_results
+           WHERE day BETWEEN $1 AND $2 GROUP BY query"#,
+        window_start(day, ZERO_RESULT_DAYS),
+        day
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|r| (r.query, r.searches))
     .collect();
     Ok(m)
 }

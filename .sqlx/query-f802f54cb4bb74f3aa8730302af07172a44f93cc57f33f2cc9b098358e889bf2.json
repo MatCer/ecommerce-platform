@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE insight_signals SET status = 'dismissed', dismissed_at = now(), dismissed_by = $2\n         WHERE id = $1 AND status <> 'dismissed' RETURNING kind, subject",
+  "query": "UPDATE insight_signals SET status = 'dismissed', dismissed_at = now(), dismissed_by = $2,\n                                    dismissed_score = score, reopened_on = NULL\n         WHERE id = $1 AND status <> 'dismissed' RETURNING kind, subject",
   "describe": {
     "columns": [
       {
@@ -37,5 +37,5 @@
       false
     ]
   },
-  "hash": "024d16fefa3b26154204153fc9e24d3e3b596f8cdb30f5b3e9cf38a9a03c18e7"
+  "hash": "f802f54cb4bb74f3aa8730302af07172a44f93cc57f33f2cc9b098358e889bf2"
 }

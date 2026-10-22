@@ -5803,7 +5803,7 @@
         "tags": [
           "insights"
         ],
-        "summary": "Hides a signal for good, also when it is detected again. Idempotent.",
+        "summary": "Hides a signal until a run detects it with at least 1.5 times its score at dismissal, which\nreopens it. Idempotent.",
         "operationId": "dismiss_insight",
         "parameters": [
           {
@@ -27737,6 +27737,30 @@
                 "type": "string"
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "Searches for one term over 14 days, in every language, that found nothing.",
+            "required": [
+              "query",
+              "searches",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "zero_result_search"
+                ]
+              },
+              "query": {
+                "type": "string"
+              },
+              "searches": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
           }
         ],
         "description": "What a detector found, with every number behind the score."
@@ -29611,6 +29635,17 @@
             ],
             "description": "Low add-to-cart: the product's name in the default market's language (`null` once the\nproduct is gone)."
           },
+          "reopened": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InsightReopened",
+                "description": "Set when a dismissed signal came back with at least 1.5 times its score at dismissal."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "score": {
             "type": "number",
             "format": "double",
@@ -29658,7 +29693,7 @@
           "samples": {
             "type": "integer",
             "format": "int64",
-            "description": "What the value rests on: sessions at the from-step, product views, or measurements."
+            "description": "What the value rests on: sessions at the from-step, product views, measurements, or\nsearches."
           },
           "value": {
             "type": [
@@ -29666,7 +29701,26 @@
               "null"
             ],
             "format": "double",
-            "description": "Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);\nslow page: the vital's p75 (ms; CLS unitless). `null` without data."
+            "description": "Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);\nslow page: the vital's p75 (ms; CLS unitless); zero-result search: the term's searches\nwithout results. `null` without data."
+          }
+        }
+      },
+      "InsightReopened": {
+        "type": "object",
+        "required": [
+          "on",
+          "dismissed_score"
+        ],
+        "properties": {
+          "dismissed_score": {
+            "type": "number",
+            "format": "double",
+            "description": "The score when staff dismissed it."
+          },
+          "on": {
+            "type": "string",
+            "format": "date",
+            "description": "The run day that reopened it."
           }
         }
       },

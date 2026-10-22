@@ -19,6 +19,8 @@ pub mod rules {
     pub const VITALS_DAYS: u64 = 14;
     pub const VITALS_MIN_SAMPLES: i64 = 50;
     pub const SLOW_PAGE_WEIGHT: f64 = 0.05;
+    pub const ZERO_RESULT_DAYS: u64 = 14;
+    pub const ZERO_RESULT_MIN_SEARCHES: i64 = 10;
 }
 
 use rules::*;
@@ -131,6 +133,8 @@ pub enum Detection {
         samples: i64,
         requests: i64,
     },
+    /// Searches for one term over 14 days, in every language, that found nothing.
+    ZeroResultSearch { query: String, searches: i64 },
 }
 
 impl Detection {
@@ -139,6 +143,7 @@ impl Detection {
             Self::FunnelDrop { .. } => "funnel_drop",
             Self::LowAddToCart { .. } => "low_add_to_cart",
             Self::SlowPage { .. } => "slow_page",
+            Self::ZeroResultSearch { .. } => "zero_result_search",
         }
     }
 
@@ -149,6 +154,7 @@ impl Detection {
             Self::SlowPage {
                 template, metric, ..
             } => format!("{template}:{}", metric.as_str()),
+            Self::ZeroResultSearch { query, .. } => query.clone(),
         }
     }
 
@@ -185,6 +191,9 @@ impl Detection {
                     * ((p75 - bound) / bound).min(1.0)
                     * SLOW_PAGE_WEIGHT
             }
+            Self::ZeroResultSearch { searches, .. } => {
+                *searches as f64 * per_week(ZERO_RESULT_DAYS)
+            }
         }
     }
 }
@@ -196,6 +205,7 @@ pub struct Metrics {
     pub products: Vec<(Uuid, i64, i64)>,
     pub vitals: Vec<VitalStat>,
     pub requests: BTreeMap<String, i64>,
+    pub zero_results: Vec<(String, i64)>,
 }
 
 #[derive(Debug, Clone)]
@@ -264,6 +274,14 @@ pub fn detect(m: &Metrics) -> Vec<Detection> {
             });
         }
     }
+    for (query, searches) in &m.zero_results {
+        if *searches >= ZERO_RESULT_MIN_SEARCHES {
+            found.push(Detection::ZeroResultSearch {
+                query: query.clone(),
+                searches: *searches,
+            });
+        }
+    }
     found.retain(|d| d.score() > 0.0 && d.score().is_finite());
     found
 }
@@ -311,6 +329,10 @@ mod tests {
         items.iter().map(|(t, n)| ((*t).to_owned(), *n)).collect()
     }
 
+    fn searches(items: &[(&str, i64)]) -> Vec<(String, i64)> {
+        items.iter().map(|(q, n)| ((*q).to_owned(), *n)).collect()
+    }
+
     fn funnel(recent: [i64; 5], baseline: [i64; 5]) -> Metrics {
         Metrics {
             funnel_recent: recent,
@@ -345,6 +367,7 @@ mod tests {
                 vital("search", Vital::Lcp, 9000.0, 49),
             ],
             requests: requests(&[("product", 20_000), ("home", 4000), ("search", 9000)]),
+            zero_results: searches(&[("pink dress", 40), ("red hat", 9)]),
         };
         assert_eq!(
             ranked(&m),
@@ -352,6 +375,7 @@ mod tests {
                 row("slow_page", "product:LCP", 300.0),
                 row("funnel_drop", "view_item_to_add_to_cart", 40.0),
                 row("slow_page", "home:INP", 30.0),
+                row("zero_result_search", "pink dress", 20.0),
                 row(
                     "low_add_to_cart",
                     "00000000-0000-0000-0000-000000000001",
@@ -372,6 +396,7 @@ mod tests {
                 vital("blog", Vital::Lcp, 5000.0, 50),
             ],
             requests: requests(&[("page", 2000), ("blog", 2000)]),
+            zero_results: searches(&[("socks", 100), ("boots", 100)]),
         };
         assert_eq!(
             ranked(&m),
@@ -384,6 +409,8 @@ mod tests {
                 ),
                 row("slow_page", "blog:LCP", 50.0),
                 row("slow_page", "page:LCP", 50.0),
+                row("zero_result_search", "boots", 50.0),
+                row("zero_result_search", "socks", 50.0),
             ]
         );
     }
@@ -534,6 +561,19 @@ mod tests {
     }
 
     #[test]
+    fn a_query_needs_10_searches_without_results() {
+        let at = |n: i64| Metrics {
+            zero_results: searches(&[("blue shirt", n)]),
+            ..Metrics::default()
+        };
+        assert_eq!(ranked(&at(9)), vec![]);
+        assert_eq!(
+            ranked(&at(10)),
+            vec![row("zero_result_search", "blue shirt", 5.0)]
+        );
+    }
+
+    #[test]
     fn detections_serialize_tagged_by_kind() {
         let d = Detection::SlowPage {
             template: "home".into(),
@@ -555,6 +595,15 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&f).unwrap()["transition"],
             f.subject().as_str()
+        );
+        let z = Detection::ZeroResultSearch {
+            query: "blue shirt".into(),
+            searches: 12,
+        };
+        assert_eq!(
+            serde_json::to_value(&z).unwrap(),
+            serde_json::json!({ "kind": "zero_result_search", "query": "blue shirt",
+                                "searches": 12 })
         );
     }
 }

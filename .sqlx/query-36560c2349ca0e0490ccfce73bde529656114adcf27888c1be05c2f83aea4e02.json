@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE insight_signals SET hypothesis = $2, theme_prompt = $3,\n                            hypothesis_model = $4, hypothesis_error = NULL, hypothesis_at = now(),\n                            hypothesis_score = $5\n                     WHERE id = $1 AND hypothesis_score IS NOT DISTINCT FROM $6",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "36560c2349ca0e0490ccfce73bde529656114adcf27888c1be05c2f83aea4e02"
+}

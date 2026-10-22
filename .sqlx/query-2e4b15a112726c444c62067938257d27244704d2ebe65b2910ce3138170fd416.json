@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE insight_signals SET status = 'open', reopened_on = $3\n               WHERE kind = $1 AND subject = $2 AND status = 'dismissed'\n                 AND $4 >= $5 * dismissed_score AND $3 >= last_detected_on\n               RETURNING id, dismissed_score AS \"dismissed_score!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "dismissed_score!",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "dismissed_score"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Date",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "2e4b15a112726c444c62067938257d27244704d2ebe65b2910ce3138170fd416"
+}

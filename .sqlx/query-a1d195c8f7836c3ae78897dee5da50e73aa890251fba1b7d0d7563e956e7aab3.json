@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, detection,\n                  CASE WHEN kind = 'low_add_to_cart'\n                       THEN insight_product_name((detection->>'product_id')::uuid) END\n                      AS product_name,\n                  score, hypothesis_score AS seen\n           FROM insight_signals\n           WHERE status = 'open'\n             AND (hypothesis_score IS NULL OR score >= $2 * hypothesis_score\n                  OR score * $2 <= hypothesis_score)\n           ORDER BY score DESC, kind COLLATE \"C\", subject COLLATE \"C\" LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "detection",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "detection"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "product_name",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "score"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "seen",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "hypothesis_score"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      true
+    ]
+  },
+  "hash": "a1d195c8f7836c3ae78897dee5da50e73aa890251fba1b7d0d7563e956e7aab3"
+}

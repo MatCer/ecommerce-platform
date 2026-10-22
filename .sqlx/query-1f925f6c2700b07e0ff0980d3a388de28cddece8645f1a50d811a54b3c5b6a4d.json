@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE insight_signals\n                     SET hypothesis_error = CASE WHEN hypothesis IS NULL THEN $2 END,\n                         hypothesis_at = CASE WHEN hypothesis IS NULL THEN now()\n                                              ELSE hypothesis_at END,\n                         hypothesis_score = $3\n                     WHERE id = $1 AND hypothesis_score IS NOT DISTINCT FROM $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1f925f6c2700b07e0ff0980d3a388de28cddece8645f1a50d811a54b3c5b6a4d"
+}
