@@ -79,13 +79,14 @@ async fn create_import(
     let input: NewImport = parse_json(&body)?;
     let actor = staff.user.user_id.clone();
     let storage = s.storage.clone();
+    let fetch = s.fetch.clone();
     create_idempotent(
         &s,
         &staff,
         &headers,
         "POST /admin/v1/imports",
         &input,
-        async |tx| import::create(tx, &storage, &actor, &input).await,
+        async |tx| import::create(tx, &storage, &fetch, &actor, &input).await,
     )
     .await
 }

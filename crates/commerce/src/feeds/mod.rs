@@ -17,6 +17,8 @@ pub enum Source {
     Heureka,
     /// Google Merchant RSS 2.0 / Atom with the `g:` namespace.
     Google,
+    /// The merchant's current shop, crawled ([`store`]).
+    Store,
 }
 
 impl Source {
@@ -24,14 +26,15 @@ impl Source {
         match self {
             Self::Heureka => "heureka",
             Self::Google => "google",
+            Self::Store => "store",
         }
     }
 
     pub fn parse(s: &str) -> Self {
-        if s == "google" {
-            Self::Google
-        } else {
-            Self::Heureka
+        match s {
+            "google" => Self::Google,
+            "store" => Self::Store,
+            _ => Self::Heureka,
         }
     }
 }

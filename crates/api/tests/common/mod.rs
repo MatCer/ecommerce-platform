@@ -188,6 +188,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
         experiments: Some(commerce::experiments::ExperimentKey::new(
             EXPERIMENTS_SECRET.as_bytes(),
         )),
+        fetch: platform::http::SafeClient::new(["localhost".to_owned()]).unwrap(),
     }
 }
 

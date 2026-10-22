@@ -26,7 +26,7 @@ use object_store::signer::{HeaderValue, Method, SignedUrlOptions};
 use object_store::{ObjectStoreExt, PutPayload};
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
-use platform::http::{Limits, SafeClient};
+use platform::http::{FetchError, Limits, SafeClient};
 use platform::queue::{self, NewJob};
 use platform::storage::Storage;
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::parse::{self, MAX_IMAGES};
+use super::store::{self, SiteReport};
 use super::{FeedItem, Source, slugify};
 use crate::audit;
 use crate::catalog::categories::{self, CategoryTranslation, NewCategory};
@@ -48,6 +49,7 @@ use crate::catalog::{I18n, ean_valid, sanitize_html};
 use crate::inventory::{self, Adjustment};
 use crate::markets::invalid;
 use crate::media::{self, UploadTarget};
+use crate::notifications::admin::{self as notifications, EmailBranding};
 use crate::pricing::{self, PriceItem, PriceUpsert};
 use crate::redirects::{self, RedirectInput};
 
@@ -60,6 +62,7 @@ pub const FEED_LIMITS: Limits = Limits {
 };
 const MAX_LISTED: usize = 200;
 const UPLOAD_CONTENT_TYPE: &str = "application/xml";
+const ONE_STORE_IMPORT: &str = "import_runs_one_store_import";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -143,6 +146,9 @@ pub struct ImportReport {
     pub collisions: Vec<Collision>,
     /// More problems or collisions than listed (200 each).
     pub truncated: bool,
+    /// Store imports: what the shop says about itself (brand suggestion, feed hint, crawl).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site: Option<SiteReport>,
 }
 
 impl ImportReport {
@@ -229,8 +235,13 @@ fn upload_key(tenant_id: Uuid, id: Uuid) -> Path {
     Path::from(format!("import-uploads/{tenant_id}/{id}.xml"))
 }
 
-fn object_key(tenant_id: Uuid, id: Uuid) -> Path {
-    Path::from(format!("imports/{tenant_id}/{id}.xml"))
+fn object_key(tenant_id: Uuid, id: Uuid, source: Source) -> Path {
+    let ext = if source == Source::Store {
+        "json"
+    } else {
+        "xml"
+    };
+    Path::from(format!("imports/{tenant_id}/{id}.{ext}"))
 }
 
 fn job(tenant_id: Uuid, run_id: Uuid, step: &str) -> NewJob<'static> {
@@ -243,6 +254,20 @@ fn job(tenant_id: Uuid, run_id: Uuid, step: &str) -> NewJob<'static> {
 
 impl NewImport {
     pub fn validate(&self) -> Result<(), Error> {
+        if self.source == Source::Store {
+            if self.url.is_none() || self.upload_size.is_some() {
+                return Err(invalid(
+                    "invalid_import",
+                    "a store import reads the shop's url, not an upload",
+                ));
+            }
+            if self.activate {
+                return Err(invalid(
+                    "store_drafts_only",
+                    "a store import only creates drafts",
+                ));
+            }
+        }
         match (&self.url, self.upload_size) {
             (Some(url), None) => {
                 let ok = url.len() <= 2000
@@ -360,16 +385,23 @@ pub async fn list(tx: &mut TenantTx) -> Result<ImportRunList, Error> {
 }
 
 /// Creates a run: a URL run is analyzed right away; an upload run returns the upload target.
+/// `fetch` decides the https rule for store URLs.
 pub async fn create(
     tx: &mut TenantTx,
     storage: &Storage,
+    fetch: &SafeClient,
     actor: &str,
     input: &NewImport,
 ) -> Result<CreatedImport, Error> {
     input.validate()?;
+    if input.source == Source::Store
+        && let Some(url) = &input.url
+    {
+        check_shop_url(fetch, url)?;
+    }
     let tenant_id = tx.tenant_id();
     let id = crate::id::new_id();
-    let key = object_key(tenant_id, id);
+    let key = object_key(tenant_id, id, input.source);
     let status = if input.url.is_some() {
         "analyzing"
     } else {
@@ -391,7 +423,7 @@ pub async fn create(
     )
     .execute(&mut **tx)
     .await
-    .map_err(crate::catalog::db_error)?;
+    .map_err(run_error)?;
     let upload = if input.url.is_some() {
         queue::enqueue(&mut **tx, &job(tenant_id, id, "analyze")).await?;
         None
@@ -428,6 +460,35 @@ pub async fn create(
     )
     .await?;
     Ok(CreatedImport { run, upload })
+}
+
+fn check_shop_url(fetch: &SafeClient, url: &str) -> Result<(), Error> {
+    match fetch.check_https(url) {
+        Ok(_) => Ok(()),
+        Err(FetchError::NotHttps) => Err(invalid(
+            "https_required",
+            "the shop's address must start with https://",
+        )),
+        Err(FetchError::Blocked(_)) => Err(invalid(
+            "blocked_url",
+            "the address is not a public internet address",
+        )),
+        Err(_) => Err(invalid(
+            "invalid_url",
+            "url must be an https URL without credentials",
+        )),
+    }
+}
+
+/// The one-store-import index as a conflict.
+fn run_error(e: sqlx::Error) -> Error {
+    if e.as_database_error().and_then(|d| d.constraint()) == Some(ONE_STORE_IMPORT) {
+        return Error::Conflict {
+            code: "import_busy",
+            detail: "another import of your shop is running; wait until it finishes".into(),
+        };
+    }
+    crate::catalog::db_error(e)
 }
 
 /// (Re)runs the dry run (after the upload, or to refresh the report before applying).
@@ -516,7 +577,8 @@ async fn set_status(
         error
     )
     .execute(&mut **tx)
-    .await?;
+    .await
+    .map_err(run_error)?;
     Ok(())
 }
 
@@ -579,11 +641,34 @@ pub async fn run_step(
     tx.commit().await?;
     let source = Source::parse(&r.source);
     let key = Path::from(r.object_key.clone());
+    let actor = format!("import:{id}");
+    let ctx = ApplyCtx {
+        db,
+        storage,
+        fetch,
+        tenant_id,
+        source,
+        target: &t,
+        actor: &actor,
+        activate: r.activate,
+    };
 
     // The analysis snapshots the feed (download, or the uploaded file) to the server-only key;
     // apply reads that snapshot, so a later upload cannot change what gets applied.
     if step == "analyze" {
         let snapshot = match &r.url {
+            Some(url) if source == Source::Store => match store::crawl(fetch, url).await {
+                Ok(crawl) => ctx.store_snapshot(crawl).await?,
+                Err(e) => {
+                    return fail(
+                        db,
+                        tenant_id,
+                        id,
+                        &format!("the shop could not be loaded: {e}"),
+                    )
+                    .await;
+                }
+            },
             Some(url) => match fetch.get(url, FEED_LIMITS).await {
                 Ok(f) => f.bytes,
                 Err(e) => {
@@ -624,17 +709,30 @@ pub async fn run_step(
         Err(e) => return Err(e.into()),
     };
     let locale = t.locale.clone();
-    let parsed = tokio::task::spawn_blocking(move || parse::read_all(&bytes, source, &locale))
-        .await
-        .map_err(internal)?;
-    let items = match parsed {
-        Ok(items) => items,
-        Err(e) => return fail(db, tenant_id, id, &e.to_string()).await,
+    let parsed = tokio::task::spawn_blocking(move || match source {
+        Source::Store => serde_json::from_slice::<store::Crawl>(&bytes)
+            .map(|c| (c.items, Some((c.site, c.problems))))
+            .map_err(|e| e.to_string()),
+        _ => parse::read_all(&bytes, source, &locale)
+            .map(|items| (items, None))
+            .map_err(|e| e.to_string()),
+    })
+    .await
+    .map_err(internal)?;
+    let (items, site) = match parsed {
+        Ok(parsed) => parsed,
+        Err(e) => return fail(db, tenant_id, id, &e).await,
     };
 
     let mut tx = tenant_tx(db, tenant_id).await?;
     let (plan, redirects, mut report) = plan(&mut tx, source, &t, items).await?;
     tx.commit().await?;
+    if let Some((site, problems)) = site {
+        for p in problems {
+            report.problem(&p.item_id, &p.code, p.detail);
+        }
+        report.site = Some(site);
+    }
     if step == "analyze" {
         let mut tx = tenant_tx(db, tenant_id).await?;
         sqlx::query!(
@@ -650,20 +748,9 @@ pub async fn run_step(
         return Ok(());
     }
 
-    let actor = format!("import:{id}");
     let mut progress = Progress {
         total: u32::try_from(plan.len()).unwrap_or(u32::MAX),
         ..Progress::default()
-    };
-    let ctx = ApplyCtx {
-        db,
-        storage,
-        fetch,
-        tenant_id,
-        source,
-        target: &t,
-        actor: &actor,
-        activate: r.activate,
     };
     for (i, group) in plan.iter().enumerate() {
         match ctx
@@ -1221,24 +1308,16 @@ fn options(
 }
 
 impl ApplyCtx<'_> {
-    /// Image assets for the group's URLs (downloaded once per URL and tenant).
+    /// Image assets for `urls` (`(url, item id for problems)`), downloaded once per URL and
+    /// tenant.
     async fn images(
         &self,
-        group: &Group,
+        urls: &[(&str, &str)],
         progress: &mut Progress,
         report: &mut ImportReport,
     ) -> Result<HashMap<String, Uuid>, Error> {
         let mut out = HashMap::new();
-        let urls: Vec<(&str, &str)> = group
-            .items
-            .iter()
-            .flat_map(|i| {
-                i.images
-                    .iter()
-                    .map(move |u| (u.as_str(), i.item_id.as_str()))
-            })
-            .collect();
-        for (url, item_id) in urls {
+        for &(url, item_id) in urls {
             if out.contains_key(url) || out.len() >= MAX_IMAGES * 2 {
                 continue;
             }
@@ -1290,6 +1369,19 @@ impl ApplyCtx<'_> {
             }
         }
         Ok(out)
+    }
+
+    /// The crawl as the run's snapshot, with its logo imported as an asset.
+    async fn store_snapshot(&self, mut crawl: store::Crawl) -> Result<Vec<u8>, Error> {
+        if let Some(logo) = crawl.site.logo_url.clone() {
+            let mut report = ImportReport::default();
+            let assets = self
+                .images(&[(&logo, "logo")], &mut Progress::default(), &mut report)
+                .await?;
+            crawl.site.logo_asset_id = assets.get(&logo).copied();
+            crawl.problems.extend(report.problems);
+        }
+        serde_json::to_vec(&crawl).map_err(internal)
     }
 
     /// The category of a path (creating missing levels), mapped by the joined path.
@@ -1387,7 +1479,16 @@ impl ApplyCtx<'_> {
         progress: &mut Progress,
         report: &mut ImportReport,
     ) -> Result<(), Error> {
-        let assets = self.images(group, progress, report).await?;
+        let urls: Vec<(&str, &str)> = group
+            .items
+            .iter()
+            .flat_map(|i| {
+                i.images
+                    .iter()
+                    .map(move |u| (u.as_str(), i.item_id.as_str()))
+            })
+            .collect();
+        let assets = self.images(&urls, progress, report).await?;
         let mut tx = tenant_tx(self.db, self.tenant_id).await?;
         let locale = self.target.locale.clone();
         let first = &group.items[0];
@@ -1740,6 +1841,95 @@ impl ApplyCtx<'_> {
         }
         Ok(())
     }
+}
+
+/// Which parts of a store import's brand suggestion to apply; the values come from the run.
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ApplyBrand {
+    /// The suggested name becomes the shop's name.
+    #[serde(default)]
+    pub name: bool,
+    /// The suggested logo becomes the email logo (the shop's only logo setting).
+    #[serde(default)]
+    pub logo: bool,
+}
+
+/// The shop's brand after the change.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ShopBrand {
+    pub name: String,
+    /// The email logo.
+    pub logo_asset_id: Option<Uuid>,
+}
+
+/// Applies a store import's brand suggestion: only what `input` names.
+pub async fn apply_brand(
+    tx: &mut TenantTx,
+    actor: &str,
+    id: Uuid,
+    input: &ApplyBrand,
+) -> Result<ShopBrand, Error> {
+    if !input.name && !input.logo {
+        return Err(invalid(
+            "nothing_to_apply",
+            "choose the name, the logo or both",
+        ));
+    }
+    let no_suggestion = || Error::Conflict {
+        code: "no_brand_suggestion",
+        detail: "this import has no such suggestion".into(),
+    };
+    let site = get(tx, id)
+        .await?
+        .report
+        .and_then(|r| r.site)
+        .ok_or_else(no_suggestion)?;
+    let tenant_id = tx.tenant_id();
+    let shop_name = async |tx: &mut TenantTx| {
+        sqlx::query_scalar!("SELECT name FROM platform.tenants WHERE id = $1", tenant_id)
+            .fetch_one(&mut **tx)
+            .await
+    };
+    let mut diff = serde_json::Map::new();
+    if input.name {
+        let name = site.name.as_deref().ok_or_else(no_suggestion)?;
+        let old = shop_name(tx).await?;
+        sqlx::query!(
+            "UPDATE platform.tenants SET name = $2 WHERE id = $1",
+            tenant_id,
+            name
+        )
+        .execute(&mut **tx)
+        .await?;
+        diff.insert("name".into(), json!({ "old": old, "new": name }));
+    }
+    if input.logo {
+        let asset = site.logo_asset_id.ok_or_else(no_suggestion)?;
+        let old = notifications::branding(tx).await?.logo_asset_id;
+        notifications::set_branding(
+            tx,
+            actor,
+            &EmailBranding {
+                logo_asset_id: Some(asset),
+            },
+        )
+        .await?;
+        diff.insert("logo_asset_id".into(), json!({ "old": old, "new": asset }));
+    }
+    audit::record(
+        tx,
+        actor,
+        "import.brand_applied",
+        "import_run",
+        Some(&id.to_string()),
+        &Value::Object(diff),
+    )
+    .await?;
+    Ok(ShopBrand {
+        name: shop_name(tx).await?,
+        logo_asset_id: notifications::branding(tx).await?.logo_asset_id,
+    })
 }
 
 #[cfg(test)]

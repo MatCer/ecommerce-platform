@@ -30,6 +30,7 @@ mod review_summaries;
 mod reviews;
 mod search;
 mod staff;
+mod store_import;
 mod storefront;
 mod tenancy;
 mod theme_ai;
