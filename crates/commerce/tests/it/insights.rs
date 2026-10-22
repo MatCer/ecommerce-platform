@@ -333,7 +333,10 @@ async fn each_run_keeps_the_days_score_and_a_rerun_overwrites_it(db: PgPool) {
     run(&runtime, &Ai::fake(), &shop, day).await;
     assert_eq!(
         scores(&runtime, shop.tenant).await,
-        vec![("home:LCP".into(), before, 50.0), ("home:LCP".into(), day, 50.0)]
+        vec![
+            ("home:LCP".into(), before, 50.0),
+            ("home:LCP".into(), day, 50.0)
+        ]
     );
 
     vitals(&runtime, &shop, day, ("home", "LCP", 5000.0, 60, 2000)).await;
@@ -341,7 +344,10 @@ async fn each_run_keeps_the_days_score_and_a_rerun_overwrites_it(db: PgPool) {
     run(&runtime, &Ai::fake(), &shop, before).await;
     assert_eq!(
         scores(&runtime, shop.tenant).await,
-        vec![("home:LCP".into(), before, 50.0), ("home:LCP".into(), day, 100.0)]
+        vec![
+            ("home:LCP".into(), before, 50.0),
+            ("home:LCP".into(), day, 100.0)
+        ]
     );
     assert_eq!(
         ranked(&runtime, shop.tenant).await,

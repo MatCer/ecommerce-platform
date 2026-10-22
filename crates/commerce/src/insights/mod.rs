@@ -283,6 +283,17 @@ async fn store(tx: &mut TenantTx, day: NaiveDate, found: &[Detection]) -> Result
         )
         .execute(&mut **tx)
         .await?;
+        sqlx::query!(
+            "INSERT INTO insight_scores (tenant_id, signal_id, day, score)
+             SELECT tenant_id, id, $3, $4 FROM insight_signals WHERE kind = $1 AND subject = $2
+             ON CONFLICT (tenant_id, signal_id, day) DO UPDATE SET score = EXCLUDED.score",
+            d.kind(),
+            d.subject(),
+            day,
+            d.score()
+        )
+        .execute(&mut **tx)
+        .await?;
     }
     sqlx::query!(
         "UPDATE insight_signals SET status = 'resolved'
