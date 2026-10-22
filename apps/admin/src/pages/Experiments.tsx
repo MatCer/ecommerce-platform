@@ -619,9 +619,16 @@ function ReadoutCard(props: { detail: Detail }) {
                 {t("experiments.readout.asOf", { date: formatDateTime(r().as_of) })}{" "}
                 {t("experiments.readout.countedHint")}
               </p>
-              <div class="overflow-x-auto rounded-md border border-border">
+              <section
+                aria-labelledby="experiment-readout-caption"
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrollable region must be reachable by keyboard
+                tabIndex={0}
+                class="overflow-x-auto rounded-md border border-border"
+              >
                 <table class={tableClass}>
-                  <caption class="sr-only">{t("experiments.readout.caption")}</caption>
+                  <caption id="experiment-readout-caption" class="sr-only">
+                    {t("experiments.readout.caption")}
+                  </caption>
                   <thead>
                     <tr>
                       <Th>{t("experiments.readout.columns.version")}</Th>
@@ -665,7 +672,7 @@ function ReadoutCard(props: { detail: Detail }) {
                     </For>
                   </tbody>
                 </table>
-              </div>
+              </section>
               <p class="text-sm text-muted-foreground">{t("experiments.readout.lossHint")}</p>
             </>
           )}
