@@ -880,6 +880,7 @@ export const cs: Dictionary = {
       discard: "Zahodit",
       accepted: "Přijato. Revizi #{{ number }} teď můžete v seznamu výše zobrazit a publikovat.",
       showRevision: "Zobrazit revizi #{{ number }}",
+      testIt: "Otestovat",
       discarded: "Zahozeno. Její revize nelze publikovat.",
       showChanges: "Zobrazit změny oproti předchozí revizi",
       usage: "{{ tokens }} tokenů",

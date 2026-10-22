@@ -879,6 +879,7 @@ export const en = {
       accepted:
         "Accepted. Revision #{{ number }} can now be previewed and published in the list above.",
       showRevision: "Show revision #{{ number }}",
+      testIt: "Test it",
       discarded: "Discarded. Its revisions cannot be published.",
       showChanges: "Show changes against the previous revision",
       usage: "{{ tokens }} tokens",

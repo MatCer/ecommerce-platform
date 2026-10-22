@@ -883,6 +883,7 @@ export const sk: Dictionary = {
       accepted:
         "Prijaté. Revíziu #{{ number }} teraz môžete v zozname vyššie zobraziť a publikovať.",
       showRevision: "Zobraziť revíziu #{{ number }}",
+      testIt: "Otestovať",
       discarded: "Zahodené. Jej revízie nemožno publikovať.",
       showChanges: "Zobraziť zmeny oproti predchádzajúcej revízii",
       usage: "{{ tokens }} tokenov",
