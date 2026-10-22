@@ -1256,6 +1256,118 @@ async fn re_enabling_review_summaries_summarizes_every_qualifying_product(db: Pg
     );
 }
 
+async fn verified_reviews(runtime: &PgPool, tenant: uuid::Uuid, product: uuid::Uuid, n: usize) {
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    for _ in 0..n {
+        sqlx::query(
+            "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                  locale, status, published_at)
+             VALUES ($1, $2, 'Jana', 5, 'Sedí.', true, 'cs', 'published', now())",
+        )
+        .bind(tenant)
+        .bind(product)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+}
+
+async fn summary_calls(runtime: &PgPool, tenant: uuid::Uuid) -> i64 {
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query_scalar("SELECT count(*) FROM ai_usage WHERE feature = 'review_summary'")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_job_that_reads_the_switch_before_the_re_enable_commits_is_covered(db: PgPool) {
+    use commerce::ai::settings::{self, AiSettingsChange};
+    use commerce::storefront::{self, PublicUrls};
+
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "re-enable-race").await;
+    verified_reviews(&runtime, shop.tenant, shop.product, 5).await;
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    drain(&db, &runtime, shop.tenant).await;
+    switch_review_summaries(&runtime, shop.tenant, false).await;
+    verified_reviews(&runtime, shop.tenant, shop.product, 1).await;
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    queue::publish(
+        &mut *tx,
+        "review.changed",
+        &json!({ "product_id": shop.product }),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    drain(&db, &runtime, shop.tenant).await;
+
+    let mut re_enable = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    settings::put(
+        &mut re_enable,
+        "owner",
+        &AiSettingsChange {
+            review_summaries: Some(true),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let debounced: i64 = sqlx::query_scalar(
+        "UPDATE queue.jobs SET run_at = now()
+         WHERE tenant_id = $1 AND kind = 'ai.review_summary' RETURNING id",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    wait_for_status(&db, debounced, "done").await;
+    assert_eq!(
+        summary_calls(&runtime, shop.tenant).await,
+        1,
+        "the debounced job read the switch off"
+    );
+    re_enable.commit().await.unwrap();
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let shown = commerce::reviews::for_product(&mut tx, &ctx, shop.product)
+        .await
+        .unwrap()
+        .ai_summary
+        .map(|s| s.review_count);
+    drop(tx);
+    assert_eq!(
+        (shown, summary_calls(&runtime, shop.tenant).await),
+        (Some(6), 2),
+        "the re-enable summarizes the review added while off"
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool) {
     use commerce::ai::settings::{self, AiSettingsChange};
