@@ -1383,7 +1383,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Hides a signal for good, also when it is detected again. Idempotent. */
+        /**
+         * Hides a signal until a run detects it with at least 1.5 times its score at dismissal, which
+         *     reopens it. Idempotent.
+         */
         post: operations["dismiss_insight"];
         delete?: never;
         options?: never;
@@ -6445,6 +6448,12 @@ export interface components {
             /** Format: int64 */
             samples: number;
             template: string;
+        } | {
+            /** @enum {string} */
+            kind: "zero_result_search";
+            query: string;
+            /** Format: int64 */
+            searches: number;
         };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
@@ -7015,6 +7024,7 @@ export interface components {
              *     product is gone).
              */
             product_name?: string | null;
+            reopened?: components["schemas"]["InsightReopened"] | null;
             /**
              * Format: double
              * @description Affected visits per week; the list is ordered by it.
@@ -7038,15 +7048,29 @@ export interface components {
         InsightMeasure: {
             /**
              * Format: int64
-             * @description What the value rests on: sessions at the from-step, product views, or measurements.
+             * @description What the value rests on: sessions at the from-step, product views, measurements, or
+             *     searches.
              */
             samples: number;
             /**
              * Format: double
              * @description Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);
-             *     slow page: the vital's p75 (ms; CLS unitless). `null` without data.
+             *     slow page: the vital's p75 (ms; CLS unitless); zero-result search: the term's searches
+             *     without results. `null` without data.
              */
             value?: number | null;
+        };
+        InsightReopened: {
+            /**
+             * Format: double
+             * @description The score when staff dismissed it.
+             */
+            dismissed_score: number;
+            /**
+             * Format: date
+             * @description The run day that reopened it.
+             */
+            on: string;
         };
         /** @enum {string} */
         InsightStatus: "open" | "dismissed" | "resolved";
