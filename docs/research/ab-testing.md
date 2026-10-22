@@ -286,6 +286,186 @@ self-hosted covers this at the cost of operating one more service.
 
 The cost is not small either way. Decide after slices 1-2. [inf]
 
+## 9. Readout and stopping rule (SHOP-99)
+
+The readout compares control with one variant on a daily UTC snapshot. It reports `collecting`,
+`winner` or `no_difference`, and the guardrails can stop the experiment. A seeded simulation of
+daily peeking picked the rule's three constants. [code]
+`crates/commerce/src/experiments/stats.rs`, `crates/commerce/src/experiments/stats/simulation.rs`
+
+**The rule.** Each arm's posterior is Beta(1 + converters, 1 + subjects - converters). The rule
+judges every daily snapshot afresh and remembers nothing from earlier days. The first gate that
+holds decides. [code] `stats.rs:169`
+
+1. If the experiment stopped for SRM, the readout is `collecting (evidence)`. A broken split
+   never names a winner.
+2. If fewer than 14 days of assignments have matured, it is `collecting (time)`.
+3. If either arm has fewer than 100 converters, it is `collecting (converters)`.
+4. If choosing either arm loses less than 2% of the control's conversion rate in expectation, it
+   is `no_difference (equivalent)`.
+5. If the arm more likely to be best has P(best) of at least 0.996, that arm is the `winner`. A
+   tie goes to control.
+6. If the experiment stopped and every attribution window has closed, it is
+   `no_difference (ended)`.
+7. Otherwise it is `collecting (evidence)`.
+
+The constants are `floor` 0.996, `epsilon` 0.02 and `min_converters` 100. [code] `stats.rs:16`
+The floor decides winners, epsilon decides equivalence, and the converter minimum gates both.
+Epsilon is relative to the control's posterior mean, so one value fits a 0.5% shop and a 5% shop.
+
+The guardrails run only while the experiment runs, in this order. [code] `stats.rs:217`
+
+1. SRM fires when Pearson's χ² of all unique assignments against the configured weights exceeds
+   10.8276, the p < 0.001 cutoff for 1 df. It needs at least 100 assignments.
+2. Harm fires when P(control best) exceeds 0.99 after 14 mature days. It has no converter
+   minimum.
+3. The duration limit fires after 56 days of real time.
+
+**Numerics.** For integer shapes, P(X > Y) is a hypergeometric tail. With Nx = a + b - 1,
+Ny = c + d - 1 and K = a + c - 1, it equals P(H <= a - 1) for H ~ Hypergeometric(Nx + Ny, Nx, K),
+by an order-statistics argument. The code gives the mode weight 1, walks out both ways with the
+ratio recurrences and sums the two tails apart with Neumaier's compensated sum, so a tiny
+probability is summed directly, never computed as 1 minus a number near 1. A direction stops
+early only when a geometric bound certifies that the remaining mass is below 1e-15 of the mass so
+far. The walk uses no factorials and no log-gamma, and it visits at most the two arms' converters
+plus 2 terms. Expected loss uses the shifted identity L_X = mean_Y P(Y+ > X) - mean_X P(Y > X+),
+where X+ is Beta(a + 1, b). The leading arm's loss comes from its small tails, and the trailing
+arm's loss adds the difference of the means. The unit tests check exact rationals such as
+P(X > Y) = 8/11 and 165/442 and losses of 41/1001 and 809/6188, exact big-integer sums at 100 to
+60,000 subjects, a 40-digit sum at 100,000 converters on 5,000,000 subjects that agrees within
+1e-15, and the truncated walk against the full support. [code] `stats.rs:299`, `stats.rs:313`
+
+**Model.** One run is one experiment, and day 0 is its start. Each day assigns N new subjects,
+split Binomial(N, 1/2) between the arms, and each arm's converters in that cohort are
+Binomial(n, p). A cohort counts only once all of it is 7 days old, so purchase timing inside the
+window does not matter. The peek at day D sees:
+
+- assignments through day min(D, stop);
+- mature cohorts through day min(D - 7, stop), which is also `mature_days`;
+- `running_days` = D while the experiment runs;
+- the final readout at D = stop + 7;
+- an untrusted split after an SRM stop.
+
+Each peek reads the readout first and runs the guardrails second, as the hourly job does once a
+day's snapshot exists. A stop ends assignment, and the peeks go on until stop + 7 days. The 56-day
+limit stops every run. [code] `simulation.rs:206`
+
+A false winner is an A/A run that shows `winner` for either arm at any peek, the 7 peeks after the
+stop included. Power is the share of lifted runs that show `winner (variant)` at any peek.
+
+**PRNG and seeds.** The generator is SplitMix64, and a test checks that seed 0 gives
+`0xe220a8397b1dcdaf` first. Uniforms are (z >> 11) * 2^-53. The daily split counts random bits,
+and conversions use inversion from k = 0 with the pmf recurrence. The sampler computes (1 - p)^n
+by squaring, because Rust leaves the precision of `powi` and `powf` to the platform. The
+simulation therefore uses only integer and basic IEEE 754 arithmetic, so the tallies should not
+depend on the machine [inf]. The debug test reproduces the release grid's tallies exactly. Each
+scenario seeds one stream for all its runs with `daily << 32 | baseline_bp << 16 | lift_percent`,
+for example `0x258_00c8_0014` for +20% at 2% and 600/day. [code] `simulation.rs:8`,
+`simulation.rs:102`
+
+**Grid and selection.** The grid crosses `floor` in {0.99, 0.993, 0.995, 0.996, 0.997, 0.998,
+0.999}, `epsilon` in {0.005, 0.01, 0.02, 0.05} and `min_converters` in {0, 25, 50, 100}. All 112
+rules read the same runs. The A/A cells run 2% at 100, 600 and 1,500 assigned subjects a day, plus
+600/day at 0.5% and at 5%, with 4,000 runs each. The lifted scenarios run +20% at 2% for 300, 600
+and 1,200/day and +10% at 1,500/day, with 2,000 runs each. The constants are picked in order, and
+each criterion must hold at every value of the constants not yet picked, so a later pick cannot
+break an earlier criterion. [code] `simulation.rs:480`
+
+1. `floor` is the smallest value whose A/A false-winner rate has a Wilson 95% upper bound of at
+   most 5% in every cell.
+2. `min_converters` is the largest value that costs at most 1 percentage point of +20% power at
+   600/day.
+3. `epsilon` is the largest value whose +10% runs at 1,500/day end `no_difference (equivalent)`
+   in at most 5% of runs.
+
+| `floor` | worst A/A upper bound over every epsilon, minimum and cell |
+|---|---|
+| 0.99 | 10.34% |
+| 0.993 | 7.62% |
+| 0.995 | 5.77% |
+| **0.996** | **4.68%** |
+| 0.997 | 3.74% |
+| 0.998 | 2.59% |
+| 0.999 | 1.50% |
+
+| `min_converters` at floor 0.996 | worst cost in +20% power at 600/day |
+|---|---|
+| 0, 25 or 50 | 0 points |
+| **100** | **0.6 points**, 53.4% to 52.8% |
+
+| `epsilon` at floor 0.996 and 100 converters | +10% runs at 1,500/day that end `equivalent` | that show it at any peek |
+|---|---|---|
+| 0.005 or 0.01 | 0% | 0% |
+| **0.02** | **0.55%** | 1.50% |
+| 0.05 | 13.95% | 45.25% |
+
+Counting the runs that show `equivalent` at any peek, not only at the end, also picks 0.02.
+Epsilon changes no A/A or power cell in the grid. A peek that clears the 0.996 floor has its
+trailing arm about 2.65 standard errors behind, and that arm then loses far more than 2% of the
+rate at these counts. [inf]
+
+**Results for the chosen rule.** The committed test pins the A/A rows and the 600/day row with
+`assert_eq!`, and the grid prints the rest. [code] `simulation.rs:326`
+
+| A/A cell, 4,000 runs | false winners | Wilson 95% upper bound | SRM stops | harm stops |
+|---|---|---|---|---|
+| 2%, 100/day | 0 | 0.10% | 45, 1.125% | 180, 4.5% |
+| 2%, 600/day | 131, 3.275% | 3.87% | 63, 1.575% | 180, 4.5% |
+| 2%, 1,500/day | 148, 3.7% | 4.33% | 62, 1.55% | 187, 4.675% |
+| 0.5%, 600/day | 0 | 0.10% | 41, 1.025% | 162, 4.05% |
+| 5%, 600/day | 153, 3.825% | 4.47% | 67, 1.675% | 149, 3.725% |
+
+| +20% at 2%, 2,000 runs | power | median first-win day | first win after the stop |
+|---|---|---|---|
+| 300/day | 500, 25% | 48 | 98, 4.9% of runs and 19.6% of winners |
+| 600/day | 1,056, 52.8% | 37 | 123, 6.15% of runs and 11.6% of winners |
+| 1,200/day | 1,723, 86.15% | 30 | 91, 4.55% of runs and 5.3% of winners |
+
+- No lifted run named control the winner. A +10% lift at 1,500/day wins in 802 runs, 40.1%, and
+  ends `equivalent` in 11, 0.55%.
+- At 2% and 100/day an arm expects 56 converters after 56 mature days, and at 0.5% and 600/day it
+  expects 84. The rule almost never decides in those cells, and their experiments end
+  `collecting (converters)`. [inf]
+- At 300/day the converter minimum costs 4.2 points of power, 29.2% to 25.0%. The criterion
+  weighs only 600/day.
+- A/A runs stop for harm in 3.7% to 4.7% of runs. Each look is a 1% test, and the daily looks
+  from day 21 add up. The spec fixes the 0.99 threshold.
+- About 12% of the winners at 600/day first show after the 56-day stop, while the last cohorts
+  mature. Promotion therefore has to work on a stopped experiment.
+- The committed test reruns the grid's runs for the chosen rule. It pins the calibration and is
+  not an independent sample. Its worst A/A upper bound is 4.47%, below the 5% target.
+
+**SMB traffic assumption [inf].** The SMB level is 600 assigned subjects a day. Assignment needs
+analytics consent, and a subject is one browser, so that is 600 × 30 = 18,000 consented unique
+visitors a month. At a 60% analytics opt-in that is 18,000 / 0.6 = 30,000 monthly visitors. At 2%
+it is 18,000 × 0.02 = 360 attributed purchases a month. No tenant traffic has been measured yet,
+because the platform has not launched.
+
+**Daily UTC snapshot.** The readout and the guardrails read the same snapshot. [code]
+`stats.rs:125`
+
+- `as_of` is the last UTC midnight. Once the experiment stops, it is at most stop + 7 days.
+- A subject is mature once assigned at least 7 days before `as_of`. Subjects assigned after the
+  stop never count.
+- `mature_days` runs from the start to min(`as_of` - 7 days, stop).
+- `running_days` is real time since the start and drives the 56-day limit.
+- `final` holds from the first midnight at or after stop + 7 days.
+- `decides_from` is the first midnight at or after start + 21 days, which is 14 mature days plus
+  the 7-day window.
+
+The cohort cutoff is daily, but the readout reads order status live. A cancellation or a full
+refund can still change a count within the day and after `final`. "Final" means every attribution
+window has closed, not that the numbers are frozen.
+
+**Reproduce.**
+
+- The committed test, `the_stopping_rule_keeps_a_a_false_winners_under_five_percent`, takes 4.0 s
+  in a debug build on the development machine, and the command also runs the unit tests:
+  `cargo test -p commerce --lib --locked experiments::stats -- --nocapture`
+- The grid takes under 1 s in a release build once built. It prints all 112 rules, the evidence
+  for each criterion and the chosen rule, and it fails unless `RULE` is that rule:
+  `cargo test -p commerce --lib --locked --release experiments::stats::simulation::calibration_grid -- --ignored --nocapture`
+
 ## Open decisions for the product owner
 
 1. **Consent:** enrol only consented visitors, and extend the analytics consent text to cover
