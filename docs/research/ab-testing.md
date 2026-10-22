@@ -434,6 +434,10 @@ rate at these counts. [inf]
   mature. Promotion therefore has to work on a stopped experiment.
 - The committed test reruns the grid's runs for the chosen rule. It pins the calibration and is
   not an independent sample. Its worst A/A upper bound is 4.47%, below the 5% target.
+- An independent sample was measured once on 2026-10-22 and not committed: the same test with
+  every scenario seed XORed with `0x5348_4f50_3939_0002`. It gave A/A false winners of 0, 2.73%,
+  3.95%, 0 and 4.10% in the cells above, in order. The worst Wilson upper bound was 4.76%, at 5%
+  and 600/day. Power for +20% at 600/day was 56.25%.
 
 **SMB traffic assumption [inf].** The SMB level is 600 assigned subjects a day. Assignment needs
 analytics consent, and a subject is one browser, so that is 600 × 30 = 18,000 consented unique
