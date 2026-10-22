@@ -279,7 +279,7 @@ pub enum StopReason {
 }
 
 impl StopReason {
-    pub const ALL: [Self; 5] = [
+    const ALL: [Self; 5] = [
         Self::Manual,
         Self::Promoted,
         Self::Srm,

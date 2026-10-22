@@ -42,12 +42,10 @@ pub(super) async fn counts(
     .await?;
     let mut out = Pair::<Counts>::default();
     for r in rows {
-        let arm = if r.arm == e.arms.control.key {
-            &mut out.control
-        } else if r.arm == e.arms.variant.key {
+        let arm = if r.arm == e.arms.variant.key {
             &mut out.variant
         } else {
-            continue;
+            &mut out.control
         };
         *arm = Counts {
             assigned: r.assigned as u64,

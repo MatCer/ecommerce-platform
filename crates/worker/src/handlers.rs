@@ -350,7 +350,6 @@ async fn theme_ai_edit(ctx: Ctx, job: Job, storage: Storage, ai: Ai) -> Result<(
     }
 }
 
-/// Hourly (WP23): stuck builds fail, artifacts nobody references are deleted.
 async fn experiment_guardrails(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let report = experiments::guardrails(&ctx.db, chrono::Utc::now())
         .await
@@ -359,6 +358,7 @@ async fn experiment_guardrails(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     Ok(())
 }
 
+/// Hourly (WP23): stuck builds fail, artifacts nobody references are deleted.
 async fn theme_maintenance(ctx: Ctx, _job: Job, storage: Storage) -> Result<(), JobError> {
     let report = themes::maintenance(&ctx.db, &storage)
         .await
