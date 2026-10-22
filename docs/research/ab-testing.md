@@ -438,6 +438,11 @@ rate at these counts. [inf]
   every scenario seed XORed with `0x5348_4f50_3939_0002`. It gave A/A false winners of 0, 2.73%,
   3.95%, 0 and 4.10% in the cells above, in order. The worst Wilson upper bound was 4.76%, at 5%
   and 600/day. Power for +20% at 600/day was 56.25%.
+- The root's spec lane measured a second independent sample on 2026-10-22, with every seed XORed
+  with `0x5350_4543_5f52_3101`. In the 5% and 600/day cell, 193 of 4,000 runs named a false
+  winner, 4.83%, with a Wilson upper bound of 5.53%. Extended to 40,000 runs, 1,617 did, 4.04%,
+  with a Wilson 95% interval of 3.85% to 4.24%. A 4,000-run sample can therefore put its upper
+  bound above 5% by chance while the true rate stays near 4%.
 
 **SMB traffic assumption [inf].** The SMB level is 600 assigned subjects a day. Assignment needs
 analytics consent, and a subject is one browser, so that is 600 × 30 = 18,000 consented unique
