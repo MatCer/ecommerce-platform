@@ -1440,6 +1440,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/imports/{id}/brand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applies a store import's brand suggestion (owner/admin): the shop name and/or the email
+         *     logo, exactly as the analysis found them. Nothing else changes.
+         */
+        post: operations["apply_brand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/insights": {
         parameters: {
             query?: never;
@@ -5230,6 +5250,13 @@ export interface components {
         AnalyzeInput: {
             mapping?: components["schemas"]["BTreeMap"] | null;
         };
+        /** @description Which parts of a store import's brand suggestion to apply; the values come from the run. */
+        ApplyBrand: {
+            /** @description The suggested logo becomes the email logo (the shop's only logo setting). */
+            logo?: boolean;
+            /** @description The suggested name becomes the shop's name. */
+            name?: boolean;
+        };
         ApplyProgress: {
             /** Format: int64 */
             done?: number;
@@ -6876,6 +6903,10 @@ export interface components {
         FeedFileList: {
             items: components["schemas"]["FeedFile"][];
         };
+        FeedHint: {
+            source: components["schemas"]["Source"];
+            url: string;
+        };
         FieldRef: {
             field: string;
             locale: string;
@@ -7131,6 +7162,7 @@ export interface components {
             products: number;
             /** Format: int32 */
             redirects: number;
+            site?: components["schemas"]["SiteReport"] | null;
             /**
              * Format: int32
              * @description Items that will not be imported (see `problems`).
@@ -9508,6 +9540,15 @@ export interface components {
             name: string;
             pickup_point?: components["schemas"]["PickupPoint"] | null;
         };
+        /** @description The shop's brand after the change. */
+        ShopBrand: {
+            /**
+             * Format: uuid
+             * @description The email logo.
+             */
+            logo_asset_id?: string | null;
+            name: string;
+        };
         ShopModel: {
             /**
              * @description `""` in the market's default locale, else `/<locale>` (spec §9.1). Page-model hrefs
@@ -9568,6 +9609,35 @@ export interface components {
         SimulateInput: {
             outcome: components["schemas"]["Outcome"];
         };
+        /** @description What the analysis found on the shop itself. */
+        SiteReport: {
+            /** @description The sitemap lists more than 200 pages; the first 200 were read. */
+            capped: boolean;
+            feed?: components["schemas"]["FeedHint"] | null;
+            /** @description The homepage after redirects. */
+            home: string;
+            /**
+             * Format: uuid
+             * @description The logo in the media library, imported by the analysis; applied only on request.
+             */
+            logo_asset_id?: string | null;
+            logo_url?: string | null;
+            /** @description Suggested shop name (plain text, at most 200 characters). */
+            name?: string | null;
+            /** Format: int32 */
+            pages_failed: number;
+            /** Format: int32 */
+            pages_fetched: number;
+            /** Format: int32 */
+            pages_without_product: number;
+            /**
+             * Format: int32
+             * @description Same-site page URLs read from the sitemap.
+             */
+            product_urls: number;
+            /** @description The crawl stopped at its time limit. */
+            timed_out: boolean;
+        };
         /** @enum {string} */
         SkipReason: "current" | "in_cart" | "excluded" | "duplicate" | "not_sold" | "out_of_stock";
         Skipped: {
@@ -9588,7 +9658,7 @@ export interface components {
          * @description Where a feed comes from (also the `import_mappings.source`).
          * @enum {string}
          */
-        Source: "heureka" | "google";
+        Source: "heureka" | "google" | "store";
         StaffList: {
             items: components["schemas"]["StaffMember"][];
         };
@@ -13918,6 +13988,58 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    apply_brand: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyBrand"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopBrand"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

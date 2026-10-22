@@ -65,6 +65,21 @@ test("demo feeds and images are served by fixed name only", async () => {
   expect((await app.request("/images/demo/missing.jpg")).status).toBe(404);
 });
 
+test("the demo shop is served by fixed name only", async () => {
+  const home = await app.request("/");
+  expect(home.headers.get("content-type")).toContain("text/html");
+  expect(await home.text()).toContain('"@type":"Organization"');
+  const index = await app.request("/sitemap.xml");
+  expect(index.headers.get("content-type")).toContain("xml");
+  expect(await index.text()).toContain("http://mocks:4010/sitemap-products.xml");
+  expect(await (await app.request("/sitemap-products.xml")).text()).toContain("/tricko-basic/");
+  expect((await app.request("/sitemap-pages.xml")).status).toBe(200);
+  expect(await (await app.request("/tricko-basic/")).text()).toContain("SK-TRICKO-BASIC");
+  for (const bad of ["/index/", "/..%2Fpackage.json/", "/tricko-basic", "/sitemap-other.xml"]) {
+    expect((await app.request(bad)).status, bad).toBe(404);
+  }
+});
+
 test("fio API mock: scripted incoming payments in the statement format", async () => {
   const add = await app.request("/fio/_transactions", {
     method: "POST",

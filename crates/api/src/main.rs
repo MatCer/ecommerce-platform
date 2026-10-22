@@ -239,6 +239,7 @@ async fn serve() -> anyhow::Result<()> {
         tracing::warn!("EXPERIMENTS_SECRET not set: nobody is enrolled in A/B experiments");
     }
     let state = api::AppState {
+        fetch: platform::http::SafeClient::from_env()?,
         experiments,
         auth_service,
         db: db.clone(),

@@ -47,6 +47,8 @@ pub enum FetchError {
     Status(u16),
     #[error("request failed: {0}")]
     Request(String),
+    #[error("only https addresses are allowed")]
+    NotHttps,
 }
 
 /// A downloaded body with its declared content type.
@@ -196,6 +198,19 @@ impl SafeClient {
         let url = Url::parse(url).map_err(|_| FetchError::InvalidUrl)?;
         check_url(&url, &self.allow_hosts)?;
         Ok(url)
+    }
+
+    /// [`Self::check`] plus the https rule: plain http only for an allowlisted host.
+    pub fn check_https(&self, url: &str) -> Result<Url, FetchError> {
+        let url = self.check(url)?;
+        let allowed = url
+            .host_str()
+            .is_some_and(|h| self.allow_hosts.contains(&h.to_ascii_lowercase()));
+        if url.scheme() == "https" || allowed {
+            Ok(url)
+        } else {
+            Err(FetchError::NotHttps)
+        }
     }
 
     /// POSTs `body` with `headers` (webhooks, §8.5) within `limits`. Any HTTP status is an
@@ -389,6 +404,36 @@ mod tests {
         ] {
             assert!(check(bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn https_urls() {
+        let strict = SafeClient::new(Vec::<String>::new()).unwrap();
+        let dev = SafeClient::new(["localhost".to_owned()]).unwrap();
+        assert!(strict.check_https("https://shop.example/").is_ok());
+        assert!(matches!(
+            strict.check_https("http://shop.example/"),
+            Err(FetchError::NotHttps)
+        ));
+        assert!(matches!(
+            strict.check_https("http://localhost:4010/"),
+            Err(FetchError::NotHttps)
+        ));
+        assert!(dev.check_https("http://localhost:4010/").is_ok());
+        assert!(matches!(
+            dev.check_https("http://shop.example/"),
+            Err(FetchError::NotHttps)
+        ));
+        for private in ["https://127.0.0.1/", "https://[::1]/", "https://10.0.0.1/"] {
+            assert!(
+                matches!(strict.check_https(private), Err(FetchError::Blocked(_))),
+                "{private}"
+            );
+        }
+        assert!(matches!(
+            strict.check_https("ftp://shop.example/"),
+            Err(FetchError::InvalidUrl)
+        ));
     }
 
     #[tokio::test]

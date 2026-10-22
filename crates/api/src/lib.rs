@@ -111,6 +111,7 @@ pub struct AppState {
     /// Packeta/PPL (WP12); `None` in tools and tests without carrier endpoints.
     pub carriers: Option<commerce::carriers::Carriers>,
     pub experiments: Option<commerce::experiments::ExperimentKey>,
+    pub fetch: platform::http::SafeClient,
 }
 
 #[derive(Clone)]

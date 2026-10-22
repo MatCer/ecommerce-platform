@@ -84,3 +84,30 @@ app.get("/images/demo/:name", async (c) => {
     return c.text("Not found", 404);
   }
 });
+
+const STORE_SITEMAPS = new Set(["sitemap.xml", "sitemap-products.xml", "sitemap-pages.xml"]);
+const STORE_PAGES = new Set([
+  "tricko-basic",
+  "mikina-crew",
+  "taska-platena",
+  "rozbity-zaznam",
+  "ostry-popis",
+  "o-nas",
+]);
+
+async function storeFile(name: string, type: string) {
+  const body = await readFile(new URL(`store/${name}`, FIXTURES));
+  return new Response(body, { headers: { "content-type": `${type}; charset=utf-8` } });
+}
+
+app.get("/", () => storeFile("index.html", "text/html"));
+
+app.get("/:name{sitemap[a-z-]*\\.xml}", (c) => {
+  const name = c.req.param("name");
+  return STORE_SITEMAPS.has(name) ? storeFile(name, "application/xml") : c.text("Not found", 404);
+});
+
+app.get("/:page/", (c) => {
+  const page = c.req.param("page");
+  return STORE_PAGES.has(page) ? storeFile(`${page}.html`, "text/html") : c.text("Not found", 404);
+});

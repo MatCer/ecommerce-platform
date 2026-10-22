@@ -9,7 +9,9 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use chrono::Utc;
 use commerce::feeds::export::{self, FeedFileList};
-use commerce::feeds::import::{self, CreatedImport, ImportRun, ImportRunList, NewImport};
+use commerce::feeds::import::{
+    self, ApplyBrand, CreatedImport, ImportRun, ImportRunList, NewImport, ShopBrand,
+};
 use commerce::search::synonyms::{self, Synonyms, SynonymsView};
 use commerce::tenancy::Role;
 use platform::Error;
@@ -29,6 +31,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(get_import))
         .routes(routes!(analyze_import))
         .routes(routes!(apply_import))
+        .routes(routes!(apply_brand))
         .routes(routes!(list_feeds))
         .routes(routes!(regenerate_feeds))
         .routes(routes!(get_synonyms, put_synonyms))
@@ -79,13 +82,14 @@ async fn create_import(
     let input: NewImport = parse_json(&body)?;
     let actor = staff.user.user_id.clone();
     let storage = s.storage.clone();
+    let fetch = s.fetch.clone();
     create_idempotent(
         &s,
         &staff,
         &headers,
         "POST /admin/v1/imports",
         &input,
-        async |tx| import::create(tx, &storage, &actor, &input).await,
+        async |tx| import::create(tx, &storage, &fetch, &actor, &input).await,
     )
     .await
 }
@@ -166,6 +170,40 @@ async fn apply_import(
     })
     .await?;
     Ok((StatusCode::ACCEPTED, Json(run)))
+}
+
+/// Applies a store import's brand suggestion (owner/admin): the shop name and/or the email
+/// logo, exactly as the analysis found them. Nothing else changes.
+#[utoipa::path(
+    post,
+    path = "/admin/v1/imports/{id}/brand",
+    tag = "feeds",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, IdParam),
+    request_body = ApplyBrand,
+    responses(
+        (status = 200, body = ShopBrand),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn apply_brand(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    id: Result<Path<Uuid>, PathRejection>,
+    body: Bytes,
+) -> Result<Json<ShopBrand>, Error> {
+    staff.require(Role::Admin)?;
+    let id = path_id(id)?;
+    let input: ApplyBrand = parse_json(&body)?;
+    let actor = &staff.user.user_id;
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            import::apply_brand(tx, actor, id, &input).await
+        })
+        .await?,
+    ))
 }
 
 /// Export feeds per market and channel (Google, Heureka, Zboží) with their public URLs.

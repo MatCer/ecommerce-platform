@@ -348,6 +348,7 @@ pub fn read<R: BufRead>(
         Source::Google => read_items(input, &["item", "entry"], |raw| {
             f(google_item(&raw, locale));
         })?,
+        Source::Store => 0,
     };
     if n == 0 {
         return Err(ParseError::Empty(source.as_str()));

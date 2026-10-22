@@ -6109,6 +6109,89 @@
         ]
       }
     },
+    "/admin/v1/imports/{id}/brand": {
+      "post": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "Applies a store import's brand suggestion (owner/admin): the shop name and/or the email\nlogo, exactly as the analysis found them. Nothing else changes.",
+        "operationId": "apply_brand",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyBrand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShopBrand"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/insights": {
       "get": {
         "tags": [
@@ -23761,6 +23844,21 @@
         },
         "additionalProperties": false
       },
+      "ApplyBrand": {
+        "type": "object",
+        "description": "Which parts of a store import's brand suggestion to apply; the values come from the run.",
+        "properties": {
+          "logo": {
+            "type": "boolean",
+            "description": "The suggested logo becomes the email logo (the shop's only logo setting)."
+          },
+          "name": {
+            "type": "boolean",
+            "description": "The suggested name becomes the shop's name."
+          }
+        },
+        "additionalProperties": false
+      },
       "ApplyProgress": {
         "type": "object",
         "properties": {
@@ -29177,6 +29275,21 @@
           }
         }
       },
+      "FeedHint": {
+        "type": "object",
+        "required": [
+          "url",
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "FieldRef": {
         "type": "object",
         "required": [
@@ -30047,6 +30160,17 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          },
+          "site": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SiteReport",
+                "description": "Store imports: what the shop says about itself (brand suggestion, feed hint, crawl)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "skipped_items": {
             "type": "integer",
@@ -37376,6 +37500,26 @@
           }
         }
       },
+      "ShopBrand": {
+        "type": "object",
+        "description": "The shop's brand after the change.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "logo_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The email logo."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "ShopModel": {
         "type": "object",
         "required": [
@@ -37535,6 +37679,86 @@
         },
         "additionalProperties": false
       },
+      "SiteReport": {
+        "type": "object",
+        "description": "What the analysis found on the shop itself.",
+        "required": [
+          "home",
+          "product_urls",
+          "pages_fetched",
+          "pages_without_product",
+          "pages_failed",
+          "capped",
+          "timed_out"
+        ],
+        "properties": {
+          "capped": {
+            "type": "boolean",
+            "description": "The sitemap lists more than 200 pages; the first 200 were read."
+          },
+          "feed": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FeedHint",
+                "description": "A product feed the shop links to: the feed importer reads it more completely."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "home": {
+            "type": "string",
+            "description": "The homepage after redirects."
+          },
+          "logo_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The logo in the media library, imported by the analysis; applied only on request."
+          },
+          "logo_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Suggested shop name (plain text, at most 200 characters)."
+          },
+          "pages_failed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "pages_fetched": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "pages_without_product": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "product_urls": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Same-site page URLs read from the sitemap.",
+            "minimum": 0
+          },
+          "timed_out": {
+            "type": "boolean",
+            "description": "The crawl stopped at its time limit."
+          }
+        }
+      },
       "SkipReason": {
         "type": "string",
         "enum": [
@@ -37606,7 +37830,8 @@
         "description": "Where a feed comes from (also the `import_mappings.source`).",
         "enum": [
           "heureka",
-          "google"
+          "google",
+          "store"
         ]
       },
       "StaffList": {

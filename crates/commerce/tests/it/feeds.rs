@@ -76,6 +76,7 @@ impl Ctx {
         let created = import::create(
             &mut tx,
             &self.storage,
+            &self.fetch,
             "boss",
             &NewImport {
                 source: Source::Heureka,
@@ -235,6 +236,7 @@ async fn url_runs_download_through_the_safe_client(db: PgPool) {
         let created = import::create(
             &mut tx,
             &c.storage,
+            &c.fetch,
             "boss",
             &NewImport {
                 source: Source::Heureka,

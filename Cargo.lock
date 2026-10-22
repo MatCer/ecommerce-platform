@@ -670,6 +670,7 @@ dependencies = [
  "governor",
  "hex",
  "hmac",
+ "html5ever",
  "image",
  "infer",
  "minijinja",
