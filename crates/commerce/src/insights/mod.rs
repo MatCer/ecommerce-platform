@@ -366,6 +366,7 @@ struct Target {
     detection: Value,
     product_name: Option<String>,
     score: f64,
+    seen: Option<f64>,
 }
 
 fn facts(d: &Detection, product: Option<&str>, locale: &str) -> Value {
@@ -510,10 +511,14 @@ async fn run_locked(
                   CASE WHEN kind = 'low_add_to_cart'
                        THEN insight_product_name((detection->>'product_id')::uuid) END
                       AS product_name,
-                  score
-           FROM insight_signals WHERE status = 'open' AND hypothesis_at IS NULL
+                  score, hypothesis_score AS seen
+           FROM insight_signals
+           WHERE status = 'open'
+             AND (hypothesis_score IS NULL OR score >= $2 * hypothesis_score
+                  OR score * $2 <= hypothesis_score)
            ORDER BY score DESC, kind COLLATE "C", subject COLLATE "C" LIMIT $1"#,
-        DAILY_MODEL_CALLS
+        DAILY_MODEL_CALLS,
+        MOVE_FACTOR
     )
     .fetch_all(&mut *tx)
     .await?;
@@ -556,13 +561,15 @@ async fn run_locked(
             Ok(((text, prompt), model)) => {
                 sqlx::query!(
                     "UPDATE insight_signals SET hypothesis = $2, theme_prompt = $3,
-                            hypothesis_model = $4, hypothesis_at = now(), hypothesis_score = $5
-                     WHERE id = $1 AND hypothesis_at IS NULL",
+                            hypothesis_model = $4, hypothesis_error = NULL, hypothesis_at = now(),
+                            hypothesis_score = $5
+                     WHERE id = $1 AND hypothesis_score IS NOT DISTINCT FROM $6",
                     t.id,
                     text,
                     prompt,
                     model,
-                    t.score
+                    t.score,
+                    t.seen
                 )
                 .execute(&mut *tx)
                 .await?;
@@ -577,12 +584,16 @@ async fn run_locked(
             Err(e) => {
                 tracing::warn!(%tenant, signal = %t.id, code = e.code(), "insight hypothesis rejected");
                 sqlx::query!(
-                    "UPDATE insight_signals SET hypothesis_error = $2, hypothesis_at = now(),
-                                                hypothesis_score = $3
-                     WHERE id = $1 AND hypothesis_at IS NULL",
+                    "UPDATE insight_signals
+                     SET hypothesis_error = CASE WHEN hypothesis IS NULL THEN $2 END,
+                         hypothesis_at = CASE WHEN hypothesis IS NULL THEN now()
+                                              ELSE hypothesis_at END,
+                         hypothesis_score = $3
+                     WHERE id = $1 AND hypothesis_score IS NOT DISTINCT FROM $4",
                     t.id,
                     e.code(),
-                    t.score
+                    t.score,
+                    t.seen
                 )
                 .execute(&mut *tx)
                 .await?;

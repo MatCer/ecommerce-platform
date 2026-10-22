@@ -694,6 +694,18 @@ async fn a_run_while_another_holds_the_tenant_does_nothing(db: PgPool) {
     assert_eq!(usage(&runtime, &shop).await, 3);
 }
 
+async fn move_usage_back_a_day(db: &PgPool) {
+    let mut owner = db.begin().await.unwrap();
+    for sql in [
+        "ALTER TABLE ai_usage NO FORCE ROW LEVEL SECURITY",
+        "UPDATE ai_usage SET at = at - interval '1 day'",
+        "ALTER TABLE ai_usage FORCE ROW LEVEL SECURITY",
+    ] {
+        sqlx::query(sql).execute(&mut *owner).await.unwrap();
+    }
+    owner.commit().await.unwrap();
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn rejected_output_is_recorded_and_never_retried(db: PgPool) {
     let (runtime, shop) = setup(&db, "bad").await;
@@ -713,15 +725,7 @@ async fn rejected_output_is_recorded_and_never_retried(db: PgPool) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    let mut owner = db.begin().await.unwrap();
-    for sql in [
-        "ALTER TABLE ai_usage NO FORCE ROW LEVEL SECURITY",
-        "UPDATE ai_usage SET at = at - interval '1 day'",
-        "ALTER TABLE ai_usage FORCE ROW LEVEL SECURITY",
-    ] {
-        sqlx::query(sql).execute(&mut *owner).await.unwrap();
-    }
-    owner.commit().await.unwrap();
+    move_usage_back_a_day(&db).await;
     run(&runtime, &Ai::fake(), &shop, day + Days::new(1)).await;
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
@@ -746,6 +750,135 @@ async fn rejected_output_is_recorded_and_never_retried(db: PgPool) {
         usage(&runtime, &shop).await,
         4,
         "rejected calls are metered"
+    );
+}
+
+fn searched(query: &str, times: i64) -> String {
+    format!("Demo AI: shoppers searched for {query} {times} times in 14 days and found nothing.")
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_hypothesis_is_rewritten_when_the_score_moves_by_half_either_way(db: PgPool) {
+    let (runtime, shop) = setup(&db, "stale").await;
+    switch(&runtime, &shop, true).await;
+    let d = |n: u64| yesterday() - Days::new(14) + Days::new(n);
+    let searches = async |n: u64, count: i32| {
+        zero_results(&runtime, &shop, &[(d(n), "cs", "modre tricko", count)]).await;
+        run(&runtime, &Ai::fake(), &shop, d(n)).await;
+        let i = list(&runtime, shop.tenant).await.remove(0);
+        (i.score, i.hypothesis.unwrap(), usage(&runtime, &shop).await)
+    };
+
+    let (score, first, calls) = searches(0, 20).await;
+    assert_eq!(
+        (score, first.text.as_str(), calls),
+        (10.0, searched("modre tricko", 20).as_str(), 1)
+    );
+
+    let (score, kept, calls) = searches(1, 9).await;
+    assert_eq!(
+        (score, &kept, calls),
+        (14.5, &first, 1),
+        "14.5 is below 1.5 times 10"
+    );
+
+    let (score, up, calls) = searches(2, 1).await;
+    assert_eq!(
+        (score, up.text.as_str(), calls),
+        (15.0, searched("modre tricko", 30).as_str(), 2)
+    );
+    assert!(up.generated_at > first.generated_at);
+
+    let (score, down, calls) = searches(14, 10).await;
+    assert_eq!(
+        (score, down.text.as_str(), calls),
+        (10.0, searched("modre tricko", 20).as_str(), 3),
+        "10 is 15 divided by 1.5"
+    );
+    assert!(down.generated_at > up.generated_at);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn new_and_stale_signals_share_the_three_calls_by_score(db: PgPool) {
+    let (runtime, shop) = setup(&db, "share").await;
+    switch(&runtime, &shop, true).await;
+    let day = yesterday();
+    let before = day - Days::new(1);
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (before, "cs", "steady", 40),
+            (before, "cs", "risen", 30),
+            (before, "cs", "climbed", 20),
+            (before, "cs", "waiting", 12),
+        ],
+    )
+    .await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    move_usage_back_a_day(&db).await;
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (day, "cs", "steady", 10),
+            (day, "cs", "risen", 16),
+            (day, "cs", "climbed", 12),
+            (day, "cs", "new", 40),
+        ],
+    )
+    .await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+
+    let got: Vec<(String, f64, Option<String>)> = list(&runtime, shop.tenant)
+        .await
+        .into_iter()
+        .map(|i| (i.detection.subject(), i.score, i.hypothesis.map(|h| h.text)))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            ("steady".into(), 25.0, Some(searched("steady", 40))),
+            ("risen".into(), 23.0, Some(searched("risen", 46))),
+            ("new".into(), 20.0, Some(searched("new", 40))),
+            ("climbed".into(), 16.0, Some(searched("climbed", 32))),
+            ("waiting".into(), 6.0, None),
+        ]
+    );
+    assert_eq!(usage(&runtime, &shop).await, 6, "three calls on each day");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_rejected_regeneration_keeps_the_text_and_date(db: PgPool) {
+    let (runtime, shop) = setup(&db, "keep").await;
+    switch(&runtime, &shop, true).await;
+    let day = yesterday();
+    let before = day - Days::new(1);
+    zero_results(&runtime, &shop, &[(before, "cs", "modre tricko", 20)]).await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    let first = list(&runtime, shop.tenant).await.remove(0).hypothesis;
+    assert!(first.is_some());
+
+    zero_results(&runtime, &shop, &[(day, "cs", "modre tricko", 10)]).await;
+    let fake = Fake::new([(
+        "insight_hypothesis",
+        r#"{"hypothesis": "See https://evil.example", "theme_prompt": "Make the search page more helpful."}"#,
+    )])
+    .unwrap();
+    let scripted = Ai::fake_with_client(Some(Client::Fake(Arc::new(fake))));
+    run(&runtime, &scripted, &shop, day).await;
+    let shown = async || {
+        let i = list(&runtime, shop.tenant).await.remove(0);
+        (i.score, i.hypothesis, usage(&runtime, &shop).await)
+    };
+    assert_eq!(shown().await, (15.0, first.clone(), 2));
+
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    assert_eq!(
+        shown().await,
+        (15.0, first, 2),
+        "the rejected score is not retried"
     );
 }
 
