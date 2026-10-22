@@ -75,12 +75,14 @@ async fn dismiss_insight(
 ) -> Result<Json<Insight>, Error> {
     let id = path_id(id)?;
     let actor = &staff.user.user_id;
-    Ok(Json(
-        in_tx(&s, staff.tenant_id, async |tx| {
-            insights::dismiss(tx, actor, id, Utc::now().date_naive()).await
-        })
-        .await?,
-    ))
+    let mut insight = in_tx(&s, staff.tenant_id, async |tx| {
+        insights::dismiss(tx, actor, id, Utc::now().date_naive()).await
+    })
+    .await?;
+    if staff.role < Role::Admin {
+        insight.experiment_id = None;
+    }
+    Ok(Json(insight))
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

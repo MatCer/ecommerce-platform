@@ -289,6 +289,16 @@ async fn admins_test_an_insights_revision_and_staff_neither_test_nor_see_it(db: 
     assert_eq!((status, &again["id"]), (StatusCode::OK, &e["id"]));
     assert_eq!(experiment_id(&boss).await, e["id"]);
     assert_eq!(experiment_id(&clerk).await, json!(null));
+    let (status, dismissed, _) =
+        Call::post(&format!("/admin/v1/insights/{insight}/dismiss"), json!({}))
+            .token(&clerk)
+            .tenant(shop.tenant)
+            .send(&s)
+            .await;
+    assert_eq!(
+        (status, &dismissed["experiment_id"]),
+        (StatusCode::OK, &json!(null))
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
