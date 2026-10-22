@@ -1300,6 +1300,39 @@ async fn zero_result_searches_become_a_signal_with_a_before_after_readout(db: Pg
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_zero_result_window_past_the_logs_retention_has_no_data(db: PgPool) {
+    let (runtime, shop) = setup(&db, "expired").await;
+    let query = Detection::ZeroResultSearch {
+        query: "modre tricko".into(),
+        searches: 10,
+    };
+    let insight = signal(&runtime, &shop, &query, "open").await;
+    let rev = publish_from(&runtime, &shop, Some(insight)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (days(d, -14), "cs", "modre tricko", 3),
+            (days(d, -1), "sk", "modre tricko", 4),
+            (days(d, 1), "cs", "modre tricko", 5),
+        ],
+    )
+    .await;
+    let after = measure(Some(5.0), 5);
+    assert_eq!(
+        change(&runtime, &shop, insight, days(d, 76)).await,
+        readout(&rev, measure(Some(7.0), 7), after),
+        "the before window starts 90 days ago, so the log still holds it"
+    );
+    assert_eq!(
+        change(&runtime, &shop, insight, days(d, 77)).await,
+        readout(&rev, measure(None, 0), after),
+        "the log has dropped the before window's first day"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn the_latest_publish_from_an_insight_wins(db: PgPool) {
     let (runtime, shop) = setup(&db, "latest").await;
     let insight = signal(

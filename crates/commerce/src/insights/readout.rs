@@ -10,6 +10,7 @@ use super::detect::{self, Detection};
 use crate::analytics::{day_bounds, web_vitals_p75};
 
 const WINDOW_DAYS: u64 = 14;
+const ZERO_RESULT_RETENTION_DAYS: u64 = 90;
 
 /// The latest theme revision published from an AI run started on this insight's draft.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -77,7 +78,7 @@ async fn window(
     today: NaiveDate,
 ) -> Result<Window, Error> {
     let measure = if today > to {
-        Some(measure(tx, d, from, to).await?)
+        Some(measure(tx, d, from, to, today).await?)
     } else {
         None
     };
@@ -89,6 +90,7 @@ async fn measure(
     d: &Detection,
     from: NaiveDate,
     to: NaiveDate,
+    today: NaiveDate,
 ) -> Result<Measure, Error> {
     match d {
         Detection::FunnelDrop { transition, .. } => {
@@ -109,6 +111,14 @@ async fn measure(
             Ok(Measure {
                 value: hit.map(|r| r.p75),
                 samples: hit.map_or(0, |r| r.samples),
+            })
+        }
+        Detection::ZeroResultSearch { .. }
+            if from < today - Days::new(ZERO_RESULT_RETENTION_DAYS) =>
+        {
+            Ok(Measure {
+                value: None,
+                samples: 0,
             })
         }
         Detection::ZeroResultSearch { query, .. } => {
