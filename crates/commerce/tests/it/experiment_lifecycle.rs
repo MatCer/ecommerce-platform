@@ -20,7 +20,7 @@ use crate::experiments::{
 use crate::tenancy::db_code;
 use crate::theme_arms::{artifact, revision};
 
-const MIGRATION: i64 = 20261029000400;
+const MIGRATION: i64 = 20261029000500;
 
 async fn refused(runtime: &PgPool, tenant: Uuid, sql: &'static str, id: Uuid) -> Option<String> {
     update(runtime, tenant, sql, id)
