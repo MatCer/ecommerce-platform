@@ -740,7 +740,6 @@ async fn signal(runtime: &PgPool, shop: &Shop, d: &Detection, status: &str) -> U
     id
 }
 
-/// An accepted AI run started from `insight`, its checked revision published for real.
 async fn publish_from(runtime: &PgPool, shop: &Shop, insight: Option<Uuid>) -> RevisionSummary {
     let artifact = "a0000000000000000000000000000001";
     let (run, rev) = (Uuid::now_v7(), Uuid::now_v7());
