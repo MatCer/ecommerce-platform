@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use platform::Error;
@@ -12,11 +13,12 @@ use uuid::Uuid;
 
 use super::fields::EntityType;
 use super::marks::{self, value_hash};
-use super::{Ai, Call, CallError, Outcome, prompts};
+use super::{Ai, Call, CallError, Outcome, prompts, settings};
 use crate::reviews;
 use crate::storefront::Context;
 
 pub const JOB: &str = "ai.review_summary";
+pub const BACKFILL_JOB: &str = "ai.review_summary_backfill";
 pub const FEATURE: &str = "review_summary";
 pub const FIELD: &str = "review_summary";
 pub const MIN_REVIEWS: i64 = 5;
@@ -39,25 +41,8 @@ pub struct ReviewSummary {
     pub generated_at: DateTime<Utc>,
 }
 
-pub(super) async fn enqueue_all(tx: &mut TenantTx) -> Result<(), Error> {
-    let products = sqlx::query_scalar!(
-        r#"SELECT product_id AS "product_id!" FROM reviews
-           WHERE status = 'published' AND verified
-           GROUP BY product_id HAVING count(*) >= $1
-           UNION SELECT product_id FROM review_summaries"#,
-        MIN_REVIEWS
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    let tenant_id = tx.tenant_id();
-    for product_id in products {
-        queue::enqueue(&mut **tx, &new_job(tenant_id, product_id)).await?;
-    }
-    Ok(())
-}
-
-fn new_job(tenant_id: Uuid, product_id: Uuid) -> NewJob<'static> {
-    let mut j = NewJob::new(JOB, json!({ "product_id": product_id }));
+fn new_job(kind: &'static str, tenant_id: Uuid, payload: Value) -> NewJob<'static> {
+    let mut j = NewJob::new(kind, payload);
     j.tenant_id = Some(tenant_id);
     j.max_attempts = 3;
     j
@@ -65,7 +50,7 @@ fn new_job(tenant_id: Uuid, product_id: Uuid) -> NewJob<'static> {
 
 pub fn debounced_job(tenant_id: Uuid, product_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
     let slot = now.timestamp().div_euclid(DEBOUNCE_SECS);
-    let mut j = new_job(tenant_id, product_id);
+    let mut j = new_job(JOB, tenant_id, json!({ "product_id": product_id }));
     j.idempotency_key = Some(format!("{JOB}:{tenant_id}:{product_id}:{slot}"));
     j.run_at = DateTime::from_timestamp((slot + 1) * DEBOUNCE_SECS, 0);
     j
@@ -77,12 +62,82 @@ pub fn job_for_event(
     payload: &Value,
     now: DateTime<Utc>,
 ) -> Option<NewJob<'static>> {
-    matches!(event_type, reviews::CHANGED_EVENT | "product.updated").then_some(())?;
-    let product_id = payload
-        .get("product_id")
-        .and_then(Value::as_str)
-        .and_then(|s| Uuid::parse_str(s).ok())?;
-    Some(debounced_job(tenant_id?, product_id, now))
+    match event_type {
+        settings::CHANGED_EVENT => {
+            let changed = settings::Changed::deserialize(payload).ok()?;
+            changed.review_summaries.then_some(())?;
+            let version = json!({ "version": changed.version });
+            Some(new_job(BACKFILL_JOB, tenant_id?, version))
+        }
+        reviews::CHANGED_EVENT | "product.updated" => {
+            let product_id = payload
+                .get("product_id")
+                .and_then(Value::as_str)
+                .and_then(|s| Uuid::parse_str(s).ok())?;
+            Some(debounced_job(tenant_id?, product_id, now))
+        }
+        _ => None,
+    }
+}
+
+/// Summarizes every qualifying product for switch-on `version`, one pass per tenant at a time.
+/// Stops as soon as a later flip of the switch supersedes `version`.
+pub async fn backfill(db: &PgPool, ai: &Ai, tenant: Uuid, version: i64) -> Result<(), Error> {
+    // A session lock on a connection taken out of the pool: if this future is dropped (lease
+    // lost, shutdown) the connection closes and the lock goes with it.
+    let mut lock = db.acquire().await?.detach();
+    loop {
+        if !is_current(db, tenant, version).await? {
+            return Ok(());
+        }
+        let locked = sqlx::query_scalar!(
+            r#"SELECT pg_try_advisory_lock(
+                   hashtextextended('review_summary_backfill:' || $1::text, 0)) AS "ok!""#,
+            tenant.to_string()
+        )
+        .fetch_one(&mut lock)
+        .await?;
+        if locked {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    let result = backfill_locked(db, ai, tenant, version).await;
+    let _ = sqlx::Connection::close(lock).await;
+    result
+}
+
+async fn backfill_locked(db: &PgPool, ai: &Ai, tenant: Uuid, version: i64) -> Result<(), Error> {
+    let products = sqlx::query_scalar!(
+        r#"SELECT product_id AS "product_id!" FROM reviews
+           WHERE status = 'published' AND verified
+           GROUP BY product_id HAVING count(*) >= $1
+           UNION SELECT product_id FROM review_summaries
+           ORDER BY 1"#,
+        MIN_REVIEWS
+    )
+    .fetch_all(&mut *tenant_tx(db, tenant).await?)
+    .await?;
+    for product_id in products {
+        if !is_current(db, tenant, version).await? {
+            return Ok(());
+        }
+        let reason = match run(db, ai, tenant, product_id, false).await {
+            Ok(Outcome::Done) => continue,
+            Ok(Outcome::Retry(reason)) => reason,
+            Err(e) => e.to_string(),
+        };
+        tracing::warn!(%product_id, error = %reason, "review summary handed to its own job");
+        let mut job = new_job(JOB, tenant, json!({ "product_id": product_id }));
+        job.max_attempts -= 1;
+        queue::enqueue(db, &job).await?;
+    }
+    Ok(())
+}
+
+async fn is_current(db: &PgPool, tenant: Uuid, version: i64) -> Result<bool, Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
+    Ok(settings::enabled_version(&mut tx).await? == Some(version))
 }
 
 struct Input {

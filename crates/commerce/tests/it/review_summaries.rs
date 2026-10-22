@@ -98,16 +98,6 @@ async fn summaries(runtime: &PgPool, shop: &Shop) -> Vec<(String, String, i32)> 
     .unwrap()
 }
 
-async fn jobs(db: &PgPool, shop: &Shop) -> i64 {
-    sqlx::query_scalar(
-        "SELECT count(*) FROM queue.jobs WHERE tenant_id = $1 AND kind = 'ai.review_summary'",
-    )
-    .bind(shop.tenant)
-    .fetch_one(db)
-    .await
-    .unwrap()
-}
-
 async fn changed_events(db: &PgPool, shop: &Shop) -> Vec<serde_json::Value> {
     sqlx::query_scalar(
         "SELECT payload FROM queue.outbox WHERE tenant_id = $1
@@ -169,7 +159,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
             insights: false,
         }
     );
-    assert_eq!(jobs(&db, &shop).await, 0, "below the minimum");
 
     run(&runtime, &ai, &shop).await;
     assert_eq!(usage(&runtime, &shop).await, 0);
@@ -206,7 +195,10 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     assert_eq!(marks, vec![mark("cs"), mark("sk")]);
     assert_eq!(
         changed_events(&db, &shop).await,
-        vec![json!({}), json!({ "product_id": shop.product })]
+        vec![
+            json!({ "review_summaries": true, "version": 1 }),
+            json!({ "product_id": shop.product })
+        ]
     );
     assert_eq!(
         shown(&runtime, &shop, shop.cz).await,
@@ -230,13 +222,19 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     switch(&runtime, &shop, false).await;
     assert_eq!(shown(&runtime, &shop, shop.cz).await, None);
     switch(&runtime, &shop, true).await;
-    assert_eq!(jobs(&db, &shop).await, 1);
     assert_eq!(
         shown(&runtime, &shop, shop.cz).await,
         Some(("cs".to_owned(), CS.to_owned(), 5))
     );
     let purges = changed_events(&db, &shop).await;
-    assert_eq!(&purges[2..], [json!({}), json!({})], "tenant purges");
+    assert_eq!(
+        &purges[2..],
+        [
+            json!({ "review_summaries": false, "version": 2 }),
+            json!({ "review_summaries": true, "version": 3 })
+        ],
+        "tenant purges"
+    );
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query("UPDATE review_summaries SET summary = 'Nejlepší!' WHERE locale = 'cs'")
@@ -447,8 +445,9 @@ async fn switching_on_refreshes_summaries_that_fell_below_the_minimum_while_off(
     run(&runtime, &ai, &shop).await;
 
     switch(&runtime, &shop, true).await;
-    assert_eq!(jobs(&db, &shop).await, 2, "the first backfill and this one");
-    run(&runtime, &ai, &shop).await;
+    review_summary::backfill(&runtime, &ai, shop.tenant, 3)
+        .await
+        .unwrap();
     assert!(summaries(&runtime, &shop).await.is_empty());
     assert_eq!(shown(&runtime, &shop, shop.cz).await, None);
 }
@@ -503,7 +502,10 @@ async fn concurrent_switch_changes_each_purge(db: PgPool) {
     drop(tx);
     assert_eq!(
         changed_events(&db, &shop).await,
-        vec![json!({}), json!({})],
+        vec![
+            json!({ "review_summaries": true, "version": 1 }),
+            json!({ "review_summaries": false, "version": 2 })
+        ],
         "on and off both purge"
     );
 }

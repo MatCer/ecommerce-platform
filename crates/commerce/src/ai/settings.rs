@@ -30,6 +30,12 @@ pub struct AiSettingsChange {
     pub insights: Option<bool>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Changed {
+    pub review_summaries: bool,
+    pub version: i64,
+}
+
 pub async fn get(tx: &mut TenantTx) -> Result<AiSettings, Error> {
     Ok(sqlx::query_as!(
         AiSettings,
@@ -39,6 +45,14 @@ pub async fn get(tx: &mut TenantTx) -> Result<AiSettings, Error> {
     .fetch_optional(&mut **tx)
     .await?
     .unwrap_or_default())
+}
+
+pub(crate) async fn enabled_version(tx: &mut TenantTx) -> Result<Option<i64>, Error> {
+    Ok(sqlx::query_scalar!(
+        "SELECT review_summaries_version FROM ai_settings WHERE review_summaries"
+    )
+    .fetch_optional(&mut **tx)
+    .await?)
 }
 
 pub async fn put(
@@ -65,18 +79,20 @@ pub async fn put(
         alt_texts: change.alt_texts.unwrap_or(before.alt_texts),
         insights: change.insights.unwrap_or(before.insights),
     };
-    sqlx::query!(
+    let version = sqlx::query_scalar!(
         "UPDATE ai_settings SET review_summaries = $2,
+             review_summaries_version = review_summaries_version + (review_summaries <> $2)::int,
              alt_texts_since = CASE WHEN $3 THEN coalesce(alt_texts_since, now()) END,
              insights = $4,
              updated_at = now()
-         WHERE tenant_id = $1",
+         WHERE tenant_id = $1
+         RETURNING review_summaries_version",
         tx.tenant_id(),
         after.review_summaries,
         after.alt_texts,
         after.insights
     )
-    .execute(&mut **tx)
+    .fetch_one(&mut **tx)
     .await?;
     audit::record(
         tx,
@@ -88,10 +104,11 @@ pub async fn put(
     )
     .await?;
     if before.review_summaries != after.review_summaries {
-        queue::publish(&mut **tx, CHANGED_EVENT, &json!({})).await?;
-    }
-    if after.review_summaries && !before.review_summaries {
-        super::review_summary::enqueue_all(tx).await?;
+        let changed = Changed {
+            review_summaries: after.review_summaries,
+            version,
+        };
+        queue::publish(&mut **tx, CHANGED_EVENT, &json!(changed)).await?;
     }
     Ok(after)
 }

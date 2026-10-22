@@ -143,7 +143,8 @@ pub fn all(
     let webhooks = extra.webhooks.clone();
     let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
-    let (ai1, ai2, ai3, ai4, ai5, ai6) = (
+    let (ai1, ai2, ai3, ai4, ai5, ai6, ai7) = (
+        extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
@@ -273,6 +274,9 @@ pub fn all(
         .register(review_summary::JOB, move |ctx, job| {
             ai_review_summary(ctx, job, ai4.clone())
         })
+        .register(review_summary::BACKFILL_JOB, move |ctx, job| {
+            ai_review_summary_backfill(ctx, job, ai7.clone())
+        })
         .register(alt_text::JOB, move |ctx, job| {
             ai_alt_text(ctx, job, ai5.clone(), alt_storage.clone())
         })
@@ -399,6 +403,20 @@ async fn ai_review_summary(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
     let (tenant, product_id) = tenant_and(&job, "product_id")?;
     let last = job.attempts >= job.max_attempts;
     ai_outcome(review_summary::run(&ctx.db, &ai, tenant, product_id, last).await)
+}
+
+async fn ai_review_summary_backfill(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent(format!("{} without tenant", job.kind)))?;
+    let version = job
+        .payload
+        .get("version")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| JobError::Permanent("payload has no version".into()))?;
+    review_summary::backfill(&ctx.db, &ai, tenant, version)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
 }
 
 async fn ai_alt_text(ctx: Ctx, job: Job, ai: Ai, storage: Storage) -> Result<(), JobError> {

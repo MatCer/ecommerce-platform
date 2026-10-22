@@ -1070,18 +1070,13 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     .fetch_all(&db)
     .await
     .unwrap();
-    let payload = json!({ "product_id": shop.product });
-    assert_eq!(
-        jobs,
-        vec![(payload.clone(), 3, false), (payload.clone(), 3, true)]
-    );
+    assert_eq!(jobs, vec![(json!({ "product_id": shop.product }), 3, true)]);
 
-    let backfill: i64 = sqlx::query_scalar(
-        "SELECT id FROM queue.jobs WHERE kind = 'ai.review_summary' ORDER BY id LIMIT 1",
-    )
-    .fetch_one(&db)
-    .await
-    .unwrap();
+    let backfill: i64 =
+        sqlx::query_scalar("SELECT id FROM queue.jobs WHERE kind = 'ai.review_summary_backfill'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
     let (stop, task) = start(
         &runtime,
         worker::handlers::all(
@@ -1115,6 +1110,437 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(purges, 2, "the switch and the new summary");
+}
+
+async fn switch_review_summaries(runtime: &PgPool, tenant: uuid::Uuid, on: bool) {
+    use commerce::ai::settings::{self, AiSettingsChange};
+
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    settings::put(
+        &mut tx,
+        "owner",
+        &AiSettingsChange {
+            review_summaries: Some(on),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+}
+
+async fn drain(db: &PgPool, runtime: &PgPool, tenant: uuid::Uuid) {
+    for _ in 0..500 {
+        let dispatched = outbox::dispatch_batch(runtime).await.unwrap();
+        let waiting: i64 = sqlx::query_scalar(
+            "SELECT (SELECT count(*) FROM queue.jobs WHERE tenant_id = $1
+                       AND status IN ('queued', 'running') AND run_at <= now())
+                  + (SELECT count(*) FROM queue.outbox WHERE tenant_id = $1
+                       AND dispatched_at IS NULL)",
+        )
+        .bind(tenant)
+        .fetch_one(db)
+        .await
+        .unwrap();
+        if dispatched == 0 && waiting == 0 {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("tenant {tenant} still has work after 10 s");
+}
+
+async fn verified_reviews(runtime: &PgPool, tenant: uuid::Uuid, product: uuid::Uuid, n: usize) {
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    for _ in 0..n {
+        sqlx::query(
+            "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                  locale, status, published_at)
+             VALUES ($1, $2, 'Jana', 5, 'Sedí.', true, 'cs', 'published', now())",
+        )
+        .bind(tenant)
+        .bind(product)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+}
+
+async fn summary_calls(runtime: &PgPool, tenant: uuid::Uuid) -> i64 {
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query_scalar("SELECT count(*) FROM ai_usage WHERE feature = 'review_summary'")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+}
+
+async fn summarized(runtime: &PgPool, tenant: uuid::Uuid) -> (Vec<(uuid::Uuid, String)>, i64) {
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    let rows = sqlx::query_as(
+        "SELECT product_id, locale FROM review_summaries ORDER BY product_id, locale",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+    drop(tx);
+    (rows, summary_calls(runtime, tenant).await)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn re_enabling_review_summaries_summarizes_every_qualifying_product(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "re-enable").await;
+    let second = testkit::catalog::product(&runtime, shop.tenant, "B", 1)
+        .await
+        .id;
+    let mut products = vec![shop.product, second];
+    products.sort();
+    for product in &products {
+        verified_reviews(&runtime, shop.tenant, *product, 5).await;
+    }
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    switch_review_summaries(&runtime, shop.tenant, false).await;
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    drain(&db, &runtime, shop.tenant).await;
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (vec![], 0),
+        "the backfill ran while the switch was off"
+    );
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    drain(&db, &runtime, shop.tenant).await;
+    let every_product: Vec<(uuid::Uuid, String)> = products
+        .iter()
+        .flat_map(|p| [(*p, "cs".to_owned()), (*p, "sk".to_owned())])
+        .collect();
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (every_product.clone(), 2),
+        "the re-enable summarizes each product once"
+    );
+
+    for on in [false, true, false, true] {
+        switch_review_summaries(&runtime, shop.tenant, on).await;
+    }
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (every_product, 2),
+        "toggling with current summaries calls no model"
+    );
+    let (per_product, backfills): (i64, i64) = sqlx::query_as(
+        "SELECT count(*) FILTER (WHERE kind = 'ai.review_summary'),
+                count(*) FILTER (WHERE kind = 'ai.review_summary_backfill')
+         FROM queue.jobs WHERE tenant_id = $1",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(per_product, 0, "toggles queue no per-product job");
+    assert!(
+        backfills <= 4,
+        "one backfill per switch-on at most: {backfills}"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_job_that_reads_the_switch_before_the_re_enable_commits_is_covered(db: PgPool) {
+    use commerce::ai::settings::{self, AiSettingsChange};
+    use commerce::storefront::{self, PublicUrls};
+
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "re-enable-race").await;
+    verified_reviews(&runtime, shop.tenant, shop.product, 5).await;
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    drain(&db, &runtime, shop.tenant).await;
+    switch_review_summaries(&runtime, shop.tenant, false).await;
+    verified_reviews(&runtime, shop.tenant, shop.product, 1).await;
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    queue::publish(
+        &mut *tx,
+        "review.changed",
+        &json!({ "product_id": shop.product }),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    drain(&db, &runtime, shop.tenant).await;
+
+    let mut re_enable = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    settings::put(
+        &mut re_enable,
+        "owner",
+        &AiSettingsChange {
+            review_summaries: Some(true),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let debounced: i64 = sqlx::query_scalar(
+        "UPDATE queue.jobs SET run_at = now()
+         WHERE tenant_id = $1 AND kind = 'ai.review_summary' RETURNING id",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    wait_for_status(&db, debounced, "done").await;
+    assert_eq!(
+        summary_calls(&runtime, shop.tenant).await,
+        1,
+        "the debounced job read the switch off"
+    );
+    re_enable.commit().await.unwrap();
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let shown = commerce::reviews::for_product(&mut tx, &ctx, shop.product)
+        .await
+        .unwrap()
+        .ai_summary
+        .map(|s| s.review_count);
+    drop(tx);
+    assert_eq!(
+        (shown, summary_calls(&runtime, shop.tenant).await),
+        (Some(6), 2),
+        "the re-enable summarizes the review added while off"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn toggles_while_a_backfill_pass_runs_end_with_current_summaries(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "busy-backfill").await;
+    let second = testkit::catalog::product(&runtime, shop.tenant, "B", 1)
+        .await
+        .id;
+    let mut products = vec![shop.product, second];
+    products.sort();
+    for product in &products {
+        verified_reviews(&runtime, shop.tenant, *product, 5).await;
+    }
+    let mut pass = db.acquire().await.unwrap();
+    sqlx::query("SELECT pg_advisory_lock(hashtextextended('review_summary_backfill:' || $1, 0))")
+        .bind(shop.tenant.to_string())
+        .execute(&mut *pass)
+        .await
+        .unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let first: i64 = sqlx::query_scalar(
+        "SELECT id FROM queue.jobs WHERE tenant_id = $1 AND kind = 'ai.review_summary_backfill'",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    wait_for_status(&db, first, "running").await;
+    switch_review_summaries(&runtime, shop.tenant, false).await;
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    wait_for_status(&db, first, "done").await;
+    assert_eq!(
+        summary_calls(&runtime, shop.tenant).await,
+        0,
+        "the superseded pass gave up without the lock"
+    );
+
+    sqlx::query("SELECT pg_advisory_unlock(hashtextextended('review_summary_backfill:' || $1, 0))")
+        .bind(shop.tenant.to_string())
+        .execute(&mut *pass)
+        .await
+        .unwrap();
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let every_product: Vec<(uuid::Uuid, String)> = products
+        .iter()
+        .flat_map(|p| [(*p, "cs".to_owned()), (*p, "sk".to_owned())])
+        .collect();
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (every_product, 2),
+        "the last switch-on summarizes each product once"
+    );
+}
+
+#[derive(Clone, Copy)]
+enum Fails {
+    Call,
+    Store,
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_product_whose_summary_call_fails_transiently_is_retried_alone(db: PgPool) {
+    failing_product_is_retried_alone(db, Fails::Call).await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_product_whose_summary_store_fails_is_retried_alone(db: PgPool) {
+    failing_product_is_retried_alone(db, Fails::Store).await;
+}
+
+async fn failing_product_is_retried_alone(db: PgPool, fails: Fails) {
+    use axum::http::StatusCode;
+    use axum::response::{IntoResponse, Response};
+    use commerce::ai::Ai;
+    use platform::ai::{Anthropic, Client};
+
+    fn reply(summaries: serde_json::Value) -> Response {
+        let text = json!({ "summaries": summaries });
+        axum::Json(json!({
+            "model": "claude-sonnet-5", "stop_reason": "end_turn",
+            "content": [{ "type": "text", "text": text.to_string() }],
+            "usage": { "input_tokens": 100, "output_tokens": 20 }
+        }))
+        .into_response()
+    }
+
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "retried-alone").await;
+    let other = testkit::catalog::product(&runtime, shop.tenant, "OTHER", 1)
+        .await
+        .id;
+    let mut products = [(shop.product, "Product TEE"), (other, "Product OTHER")];
+    products.sort();
+    let [(invalid, _), (failing, failing_name)] = products;
+    for (product, _) in products {
+        verified_reviews(&runtime, shop.tenant, product, 5).await;
+    }
+    if let Fails::Store = fails {
+        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+            "CREATE SEQUENCE public.summary_store_failures;
+             CREATE FUNCTION public.fail_first_summary_store() RETURNS trigger
+                 LANGUAGE plpgsql SECURITY DEFINER AS $$
+             BEGIN
+                 IF NEW.product_id = '{failing}'
+                    AND nextval('public.summary_store_failures') = 1 THEN
+                     RAISE EXCEPTION 'injected summary store failure';
+                 END IF;
+                 RETURN NEW;
+             END
+             $$;
+             CREATE TRIGGER fail_first_summary_store BEFORE INSERT ON review_summaries
+                 FOR EACH ROW EXECUTE FUNCTION public.fail_first_summary_store();"
+        )))
+        .execute(&db)
+        .await
+        .unwrap();
+    }
+
+    let invalid_calls = Arc::new(AtomicU32::new(0));
+    let failing_calls = Arc::new(AtomicU32::new(0));
+    let app = axum::Router::new().route(
+        "/v1/messages",
+        axum::routing::post({
+            let (invalid_calls, failing_calls) = (invalid_calls.clone(), failing_calls.clone());
+            move |body: String| {
+                let (invalid_calls, failing_calls) = (invalid_calls.clone(), failing_calls.clone());
+                async move {
+                    if !body.contains(failing_name) {
+                        invalid_calls.fetch_add(1, Ordering::SeqCst);
+                        return reply(json!([]));
+                    }
+                    let first = failing_calls.fetch_add(1, Ordering::SeqCst) == 0;
+                    if first && matches!(fails, Fails::Call) {
+                        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                    }
+                    reply(json!([
+                        { "locale": "cs", "summary": "Dobré." },
+                        { "locale": "sk", "summary": "Dobré." }
+                    ]))
+                }
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/", listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let client = Anthropic::new(&url, "sk-test".into(), Duration::from_secs(10), 0).unwrap();
+    let mut extra = worker::handlers::Extra::disabled().unwrap();
+    extra.ai = Ai::fake_with_client(Some(Client::Anthropic(Arc::new(client))));
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            extra,
+        ),
+        fast_config(),
+    );
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert_eq!(
+        (
+            summarized(&runtime, shop.tenant).await.0,
+            invalid_calls.load(Ordering::SeqCst),
+            failing_calls.load(Ordering::SeqCst)
+        ),
+        (
+            vec![(failing, "cs".to_owned()), (failing, "sk".to_owned())],
+            1,
+            2
+        ),
+        "only the failing product {failing} is called again, not {invalid}"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
