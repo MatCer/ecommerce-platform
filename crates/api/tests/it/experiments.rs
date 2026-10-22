@@ -6,7 +6,7 @@ use commerce::content::LegalType;
 use commerce::content::legal::{self, InstallInput};
 use commerce::experiments;
 use platform::db::tenant_tx;
-use serde_json::json;
+use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -46,6 +46,15 @@ async fn start(runtime: &PgPool, tenant: Uuid) -> Uuid {
 }
 
 async fn start_with(runtime: &PgPool, tenant: Uuid, arms: serde_json::Value) -> Uuid {
+    publish_cookie_page(runtime, tenant).await;
+    let id = draft_with(runtime, tenant, arms).await;
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    experiments::start(&mut tx, "test", id).await.unwrap();
+    tx.commit().await.unwrap();
+    id
+}
+
+async fn publish_cookie_page(runtime: &PgPool, tenant: Uuid) {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let installed = legal::install(
         &mut tx,
@@ -63,11 +72,6 @@ async fn start_with(runtime: &PgPool, tenant: Uuid, arms: serde_json::Value) -> 
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    let id = draft_with(runtime, tenant, arms).await;
-    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
-    experiments::start(&mut tx, "test", id).await.unwrap();
-    tx.commit().await.unwrap();
-    id
 }
 
 fn as_owner<'a>(call: Call<'a>, token: &'a str, tenant: Uuid) -> Call<'a> {
@@ -462,4 +466,209 @@ async fn the_edges_arm_overrides_the_home_hero_in_the_page_model(db: PgPool) {
             "{why} renders control"
         );
     }
+}
+
+const EXPERIMENTS: &str = "/admin/v1/experiments";
+
+fn keys(v: &serde_json::Value) -> Vec<&str> {
+    v.as_object().unwrap().keys().map(String::as_str).collect()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn admins_create_read_stop_and_promote_an_experiment(db: PgPool) {
+    let jwks = jwks_server(json!([jwk("a", X_A)])).await;
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "exp-admin").await;
+    testkit::staff(&runtime, shop.tenant, "boss", "owner").await;
+    let s = state(runtime.clone(), &jwks, Duration::from_secs(30));
+    let owner = sign(&claims("boss"));
+    let admin = |call| as_owner(call, &owner, shop.tenant);
+    let input = json!({
+        "name": "homepage",
+        "change": {"kind": "hero", "hero": {"title": {"cs": "Nová kolekce"}}},
+    });
+
+    let (status, created, res) = admin(Call::post(EXPERIMENTS, input.clone()).key("exp-1"))
+        .send(&s)
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    assert!(res.headers().get("idempotent-replayed").is_none());
+    assert_eq!(
+        keys(&created),
+        [
+            "change",
+            "created_at",
+            "id",
+            "name",
+            "promoted_at",
+            "started_at",
+            "status",
+            "stop_reason",
+            "stopped_at",
+            "version"
+        ]
+    );
+    assert_eq!(
+        (
+            &created["name"],
+            &created["version"],
+            &created["status"],
+            &created["change"]
+        ),
+        (
+            &json!("homepage"),
+            &json!(1),
+            &json!("draft"),
+            &json!({"kind": "hero", "hero": {"title": {"cs": "Nová kolekce"}}})
+        )
+    );
+    let (status, replayed, res) = admin(Call::post(EXPERIMENTS, input).key("exp-1"))
+        .send(&s)
+        .await;
+    assert_eq!((status, &replayed), (StatusCode::CREATED, &created));
+    assert_eq!(res.headers()["idempotent-replayed"], "true");
+
+    let (status, list, _) = admin(Call::get(EXPERIMENTS)).send(&s).await;
+    assert_eq!(
+        (status, list),
+        (StatusCode::OK, json!({"items": [created]}))
+    );
+    let id = created["id"].as_str().unwrap();
+    let one = format!("{EXPERIMENTS}/{id}");
+    let (status, detail, _) = admin(Call::get(&one)).send(&s).await;
+    assert_eq!(
+        (status, detail),
+        (
+            StatusCode::OK,
+            json!({"experiment": created, "readout": null})
+        )
+    );
+
+    publish_cookie_page(&runtime, shop.tenant).await;
+    let [start, stop, promote] = ["start", "stop", "promote"].map(|a| format!("{one}/{a}"));
+    let post = |uri| Call::post_raw(uri, "", "application/json");
+    let (status, _, _) = admin(post(&start)).send(&s).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, detail, _) = admin(Call::get(&one)).send(&s).await;
+    assert_eq!(status, StatusCode::OK, "{detail}");
+    assert_eq!(detail["experiment"]["status"], "running");
+    let readout = &detail["readout"];
+    assert_eq!(
+        keys(readout),
+        [
+            "as_of",
+            "control",
+            "decides_from",
+            "final",
+            "min_converters",
+            "state",
+            "variant"
+        ]
+    );
+    assert_eq!(
+        readout["state"],
+        json!({"state": "collecting", "need": "time"})
+    );
+    let control = &readout["control"];
+    assert_eq!(
+        keys(control),
+        [
+            "assigned",
+            "conversion_rate",
+            "converters",
+            "expected_loss",
+            "p_best",
+            "subjects"
+        ]
+    );
+    assert_eq!(
+        [
+            &control["assigned"],
+            &control["subjects"],
+            &control["converters"],
+            &control["conversion_rate"]
+        ],
+        [&json!(0), &json!(0), &json!(0), &json!(null)]
+    );
+
+    for _ in 0..2 {
+        let (status, body, _) = admin(post(&stop)).send(&s).await;
+        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    }
+
+    let mut stale = claims("boss");
+    stale["auth_time"] = json!(now() - 20 * 60);
+    let stale = sign(&stale);
+    let (status, problem, _) = post(&promote)
+        .token(&stale)
+        .tenant(shop.tenant)
+        .send(&s)
+        .await;
+    assert_eq!(
+        (status, problem["code"].as_str()),
+        (StatusCode::UNAUTHORIZED, Some("reauth_required"))
+    );
+    let (status, promoted, _) = admin(post(&promote)).send(&s).await;
+    assert_eq!(status, StatusCode::OK, "{promoted}");
+    assert_eq!(
+        (&promoted["status"], &promoted["stop_reason"]),
+        (&json!("stopped"), &json!("manual"))
+    );
+    assert!(promoted["promoted_at"].is_string(), "{promoted}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn only_admins_of_the_tenant_reach_its_experiments(db: PgPool) {
+    let jwks = jwks_server(json!([jwk("a", X_A)])).await;
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "exp-roles").await;
+    let (other, _) = testkit::tenant(&runtime, "exp-other").await;
+    testkit::staff(&runtime, shop.tenant, "clerk", "staff").await;
+    testkit::staff(&runtime, other, "rival", "owner").await;
+    let s = state(runtime.clone(), &jwks, Duration::from_secs(30));
+    let (clerk, rival) = (sign(&claims("clerk")), sign(&claims("rival")));
+    let id = start(&runtime, shop.tenant).await;
+    let one = format!("{EXPERIMENTS}/{id}");
+    let routes = [
+        ("POST", EXPERIMENTS.to_owned()),
+        ("GET", EXPERIMENTS.to_owned()),
+        ("GET", one.clone()),
+        ("POST", format!("{one}/start")),
+        ("POST", format!("{one}/stop")),
+        ("POST", format!("{one}/promote")),
+    ];
+    let body = json!({"name": "other", "change": {"kind": "hero", "hero": {"title": {"cs": "X"}}}});
+    fn call<'a>(method: &str, uri: &'a str, body: &Value) -> Call<'a> {
+        match method {
+            "GET" => Call::get(uri),
+            _ => Call::post(uri, body.clone()),
+        }
+    }
+
+    for (method, uri) in &routes {
+        let (status, problem, _) = call(method, uri, &body)
+            .token(&clerk)
+            .tenant(shop.tenant)
+            .send(&s)
+            .await;
+        assert_eq!(
+            (status, problem["code"].as_str()),
+            (StatusCode::FORBIDDEN, Some("insufficient_role")),
+            "{method} {uri}"
+        );
+    }
+    for (method, uri) in &routes[2..] {
+        let (status, _, _) = call(method, uri, &body)
+            .token(&rival)
+            .tenant(other)
+            .send(&s)
+            .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{method} {uri}");
+    }
+    let (_, list, _) = Call::get(EXPERIMENTS)
+        .token(&rival)
+        .tenant(other)
+        .send(&s)
+        .await;
+    assert_eq!(list, json!({"items": []}));
 }

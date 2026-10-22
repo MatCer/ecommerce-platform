@@ -195,7 +195,7 @@ pub const GUARDRAIL_ACTOR: &str = "system:experiments";
 const CONTROL: &str = "control";
 const VARIANT: &str = "variant";
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct NewExperiment {
     /// `^[a-z0-9][a-z0-9_-]{0,63}$`; a name used before gets its next version.
     pub name: String,
@@ -203,7 +203,7 @@ pub struct NewExperiment {
 }
 
 /// What the variant arm changes; the control arm is the shop as it is.
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum NewChange {
     Hero {
