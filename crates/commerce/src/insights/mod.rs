@@ -60,7 +60,7 @@ pub struct Insight {
     /// The latest theme change published from this insight's draft (`null` when none).
     pub theme_change: Option<ThemeChange>,
     /// The newest experiment testing the final revision of an AI theme edit started from this
-    /// insight's draft (`null` when none).
+    /// insight's draft (`null` when none, and for staff: experiments are owner/admin).
     pub experiment_id: Option<Uuid>,
     /// Set when a dismissed signal came back with at least 1.5 times its score at dismissal.
     pub reopened: Option<Reopened>,

@@ -6284,6 +6284,101 @@
         ]
       }
     },
+    "/admin/v1/insights/{id}/experiments": {
+      "post": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Prepares a draft experiment testing the insight's accepted AI theme revision against the\nactive theme, or returns the experiment that already tests it (owner/admin). Start it\nthrough the experiments API.",
+        "operationId": "test_insight_revision",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightNewExperiment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Experiment"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "unknown insight, or not the final revision of an AI theme edit started from it",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ai_run_not_accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_body, theme_revision_not_ready",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/inventory": {
       "get": {
         "tags": [
@@ -30356,7 +30451,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "The newest experiment testing the final revision of an AI theme edit started from this\ninsight's draft (`null` when none)."
+            "description": "The newest experiment testing the final revision of an AI theme edit started from this\ninsight's draft (`null` when none, and for staff: experiments are owner/admin)."
           },
           "first_detected_on": {
             "type": "string",
@@ -30432,7 +30527,7 @@
             "items": {
               "$ref": "#/components/schemas/Insight"
             },
-            "description": "Open signals, and resolved ones a published theme change came from; most affected\nvisits first (at most 50)."
+            "description": "Open signals, and resolved ones a published theme change came from or an experiment\ntests; most affected visits first (at most 50)."
           }
         }
       },
@@ -30457,6 +30552,20 @@
             "description": "Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);\nslow page: the vital's p75 (ms; CLS unitless); zero-result search: the term's searches\nwithout results. `null` without data."
           }
         }
+      },
+      "InsightNewExperiment": {
+        "type": "object",
+        "required": [
+          "revision_id"
+        ],
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The final revision of an accepted AI theme edit started from the insight's draft."
+          }
+        },
+        "additionalProperties": false
       },
       "InsightReopened": {
         "type": "object",
