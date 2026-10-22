@@ -20,14 +20,10 @@ use crate::storefront::pages::{self, HeroCopy, HomePage};
 use crate::themes;
 
 mod readout;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the guardrails call it from the next commit")
-)]
 mod stats;
 
 pub use stats::{Basis, Need, ReadoutState, Side};
-use stats::{Pair, Snapshot};
+use stats::{Guardrail, Pair, Snapshot};
 
 /// The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -193,6 +189,7 @@ async fn running_with_arms(
     }))
 }
 
+pub const GUARDRAILS_JOB: &str = "experiments.guardrails";
 pub const CHANGED_EVENT: &str = "experiment.changed";
 pub const GUARDRAIL_ACTOR: &str = "system:experiments";
 const CONTROL: &str = "control";
@@ -757,6 +754,66 @@ async fn stop_locked(
             Ok(Stopped::Now)
         }
     }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct GuardrailReport {
+    pub stopped: u64,
+}
+
+/// Stops each tenant's running experiment whose split is broken, whose variant is clearly
+/// worse, or that ran too long. A failing tenant does not stop the others; it fails the run
+/// afterwards so the job retries, which is harmless because a stop happens once.
+pub async fn guardrails(db: &PgPool, now: DateTime<Utc>) -> Result<GuardrailReport, Error> {
+    let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+        .fetch_all(db)
+        .await?;
+    let mut report = GuardrailReport::default();
+    let mut failed = 0;
+    for tenant in tenants {
+        match check_tenant(db, tenant, now).await {
+            Ok(stopped) => report.stopped += u64::from(stopped),
+            Err(e) => {
+                failed += 1;
+                tracing::error!(%tenant, error = %e, "experiment guardrails failed");
+            }
+        }
+    }
+    if failed > 0 {
+        return Err(Error::Internal(format!(
+            "experiment guardrails failed for {failed} tenants"
+        )));
+    }
+    Ok(report)
+}
+
+async fn check_tenant(db: &PgPool, tenant: Uuid, now: DateTime<Utc>) -> Result<bool, Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
+    let Some(id) = sqlx::query_scalar!("SELECT id FROM experiments WHERE status = 'running'")
+        .fetch_optional(&mut *tx)
+        .await?
+    else {
+        return Ok(false);
+    };
+    let e = fetch(&mut tx, id).await?;
+    let Some(guardrail) = snapshot(&mut tx, &e, now)
+        .await?
+        .and_then(|(_, s)| stats::guardrail(&s))
+    else {
+        return Ok(false);
+    };
+    let (reason, evidence) = match guardrail {
+        Guardrail::Srm { chi2 } => (StopReason::Srm, Some(("chi2", chi2))),
+        Guardrail::Harm { p_worse } => (StopReason::Harm, Some(("p_worse", p_worse))),
+        Guardrail::MaxDuration => (StopReason::MaxDuration, None),
+    };
+    let evidence = evidence
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), json!(v)))
+        .collect();
+    let stopped = stop_locked(&mut tx, GUARDRAIL_ACTOR, id, reason, evidence).await?;
+    tx.commit().await?;
+    Ok(matches!(stopped, Stopped::Now))
 }
 
 pub async fn enrol(
