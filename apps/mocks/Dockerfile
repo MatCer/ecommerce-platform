@@ -12,6 +12,7 @@ COPY apps/mocks/src apps/mocks/src
 # Demo merchant feeds + product photos (WP13a URL import).
 COPY fixtures/feeds/heureka-demo.xml fixtures/feeds/google-demo.xml fixtures/feeds/
 COPY fixtures/images/demo fixtures/images/demo
+COPY fixtures/store fixtures/store
 ENV NODE_ENV=production PORT=4010
 USER node
 EXPOSE 4010
