@@ -32,3 +32,20 @@ export function detectionParams(d: Detection, locale: string): Record<string, st
       };
   }
 }
+
+export function measureText(
+  d: Detection,
+  m: Schemas["InsightMeasure"],
+  locale: string,
+  t: (
+    key: "insights.change.noData" | `insights.change.${Detection["kind"]}`,
+    params?: Record<string, string>,
+  ) => string,
+): string {
+  if (m.value == null) return t("insights.change.noData");
+  const value =
+    d.kind === "slow_page"
+      ? formatVital(d.metric, m.value, locale)
+      : formatPercent(m.value, locale);
+  return t(`insights.change.${d.kind}`, { value, samples: formatNumber(m.samples, locale) });
+}

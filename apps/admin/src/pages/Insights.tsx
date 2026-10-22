@@ -6,7 +6,7 @@ import { PageHeader, QueryState } from "../components/Page.tsx";
 import { errorMessage, locale, t } from "../i18n/index.ts";
 import { templateLabel } from "../lib/analytics.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
-import { detectionParams } from "../lib/insights.ts";
+import { detectionParams, measureText } from "../lib/insights.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
 
 type Insight = Schemas["Insight"];
@@ -83,7 +83,7 @@ function InsightCard(props: {
         <p class="text-sm text-foreground">
           {t(`insights.${d().kind}`, detectionParams(d(), locale()))}
         </p>
-        <p class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span class="figures">
             {t("insights.affected", {
               n: new Intl.NumberFormat(locale()).format(
@@ -91,7 +91,15 @@ function InsightCard(props: {
               ),
             })}
           </span>
-          <span>{t("insights.since", { date: day(props.insight.first_detected_on) })}</span>
+          <Show
+            when={props.insight.status === "resolved"}
+            fallback={
+              <span>{t("insights.since", { date: day(props.insight.first_detected_on) })}</span>
+            }
+          >
+            <Badge>{t("insights.resolved")}</Badge>
+            <span>{t("insights.lastDetected", { date: day(props.insight.last_detected_on) })}</span>
+          </Show>
         </p>
         <Show when={props.insight.hypothesis}>
           {(h) => (
@@ -115,6 +123,46 @@ function InsightCard(props: {
               <p class="text-xs text-muted-foreground">
                 {t("insights.model", { model: h().model })}
               </p>
+            </section>
+          )}
+        </Show>
+        <Show when={props.insight.theme_change}>
+          {(c) => (
+            <section
+              aria-labelledby={`${headingId()}-change`}
+              class="flex flex-col gap-2 rounded-md border border-border bg-subtle p-3"
+            >
+              <h3 id={`${headingId()}-change`} class="text-sm font-semibold text-heading">
+                {t("insights.change.title")}
+              </h3>
+              <p class="text-xs text-muted-foreground">
+                {t("insights.change.published", {
+                  number: c().revision_number,
+                  date: day(c().published_at.slice(0, 10)),
+                })}
+              </p>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <For each={["before", "after"] as const}>
+                  {(side) => (
+                    <div class="flex flex-col gap-0.5">
+                      <dt class="text-xs text-muted-foreground">
+                        {t(`insights.change.${side}`, {
+                          from: day(c()[side].from),
+                          to: day(c()[side].to),
+                        })}
+                      </dt>
+                      <dd class="figures text-sm text-heading">
+                        <Show
+                          when={c()[side].measure}
+                          fallback={t("insights.change.collecting", { date: day(c()[side].to) })}
+                        >
+                          {(m) => measureText(d(), m(), locale(), t)}
+                        </Show>
+                      </dd>
+                    </div>
+                  )}
+                </For>
+              </dl>
             </section>
           )}
         </Show>

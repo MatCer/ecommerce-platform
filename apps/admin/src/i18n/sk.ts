@@ -2386,12 +2386,14 @@ export const sk: Dictionary = {
     title: "Postrehy",
     description:
       "Kde obchod stráca návštevy, podľa analytiky posledných týždňov. Zoradené podľa ovplyvnených návštev: odhadu, koľko návštev týždenne by sa dostalo ďalej pri bežnej miere obchodu alebo na rýchlej stránke.",
-    list: "Otvorené postrehy",
+    list: "Postrehy",
     empty: "Za posledných 14 dní nič nevybočuje.",
     emptyHint:
       "Postrehy potrebujú dosť návštevnosti: 100 relácií týždenne pre krok nákupu, 200 zobrazení pre produkt a 50 meraní rýchlosti pre typ stránky.",
     affected: "Ovplyvnené návštevy: ~{{n}} týždenne",
     since: "Zistené od {{date}}",
+    resolved: "Už sa neprejavuje",
+    lastDetected: "Naposledy zistené {{date}}",
     deletedProduct: "Odstránený produkt",
     slowHeading: "{{template}}: {{metric}}",
     hypothesis: "Možná príčina",
@@ -2400,6 +2402,17 @@ export const sk: Dictionary = {
     dismiss: "Skryť",
     dismissed: "Postreh skrytý",
     openInEditor: "Otvoriť v AI úpravách vzhľadu",
+    change: {
+      title: "Pred zmenou vzhľadu a po nej",
+      published: "Revízia vzhľadu #{{number}} zverejnená {{date}}",
+      before: "Pred ({{from}} – {{to}})",
+      after: "Po ({{from}} – {{to}})",
+      collecting: "Údaje sa zbierajú do {{date}}",
+      noData: "Žiadne údaje",
+      funnel_drop: "{{value}} z {{samples}} relácií",
+      low_add_to_cart: "{{value}} z {{samples}} zobrazení",
+      slow_page: "p75 {{value}} z {{samples}} meraní",
+    },
     transitions: {
       sessions_to_view_item: "Návštevy, ktoré sa dostanú k produktu",
       view_item_to_add_to_cart: "Návštevníci produktu, ktorí pridajú do košíka",

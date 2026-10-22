@@ -17,6 +17,9 @@ const SESSION = "0197a8a0-0000-7000-8000-0000000e2e38";
 const ANON = "e2e38e2e38e2e38e2e38e2e38e2e38e2";
 const RECENT = "current_date - 3";
 const BASELINE = "current_date - 12";
+const BEFORE = "current_date - 27";
+const AFTER = "current_date - 10";
+const MARK = "e2e:insights";
 const FUNNEL = [
   "sessions",
   "funnel.view_item",
@@ -37,13 +40,17 @@ const day = (offset: number) =>
 
 function cleanUp(): void {
   sql(`UPDATE ai_settings SET insights = false WHERE tenant_id = ${DEMO}`);
+  sql(`UPDATE ai_theme_runs SET revision_id = NULL WHERE tenant_id = ${DEMO} AND created_by = '${MARK}';
+       DELETE FROM theme_revisions WHERE tenant_id = ${DEMO} AND created_by = '${MARK}';
+       DELETE FROM ai_theme_runs WHERE tenant_id = ${DEMO} AND created_by = '${MARK}'`);
   sql(`DELETE FROM insight_signals WHERE tenant_id = ${DEMO}
        AND (kind, subject) IN (('slow_page', 'blog:INP'), ('funnel_drop', 'view_item_to_add_to_cart'),
                                ('low_add_to_cart', '${weak}'), ('low_add_to_cart', '${strong}'))`);
   sql(`DELETE FROM daily_metrics WHERE tenant_id = ${DEMO} AND market_id = ${MARKET}
        AND ((date IN (${RECENT}, ${BASELINE}) AND dims = '{}'
              AND metric IN (${FUNNEL.map((m) => `'${m}'`).join(", ")}))
-         OR (date = ${RECENT} AND dims->>'product_id' IN ('${weak}', '${strong}')))`);
+         OR (date IN (${RECENT}, ${BEFORE}, ${AFTER})
+             AND dims->>'product_id' IN ('${weak}', '${strong}')))`);
   sql(`DELETE FROM events WHERE tenant_id = ${DEMO} AND session_id = '${SESSION}'`);
   sql(`DELETE FROM analytics_counters WHERE tenant_id = ${DEMO} AND market_id = ${MARKET}
        AND day = ${RECENT} AND template = 'blog'`);
@@ -57,9 +64,9 @@ function funnel(date: string, values: number[]): void {
        VALUES ${rows.join(", ")}`);
 }
 
-function productViews(product: string, views: number, adds: number): void {
+function productViews(product: string, views: number, adds: number, date = RECENT): void {
   sql(`INSERT INTO daily_metrics (tenant_id, date, market_id, metric, dims, value)
-       SELECT ${DEMO}, ${RECENT}, ${MARKET}, m, jsonb_build_object('product_id', '${product}'), v
+       SELECT ${DEMO}, ${date}, ${MARKET}, m, jsonb_build_object('product_id', '${product}'), v
        FROM (VALUES ('product.views', ${views}), ('product.add_to_carts', ${adds})) x(m, v)`);
 }
 
@@ -123,7 +130,7 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
   await admin.setViewportSize({ width: 390, height: 844 });
   await admin.goto("/insights");
   await expect(admin.getByRole("heading", { level: 1, name: "Insights" })).toBeVisible();
-  const list = admin.getByRole("list", { name: "Open insights" });
+  const list = admin.getByRole("list", { name: "Insights" });
   const slow = list.getByRole("region", { name: "Blog: INP" });
   const drop = list.getByRole("region", { name: "Product viewers who add to cart" });
   const product = list.getByRole("region", { name: weakName, exact: true });
@@ -239,6 +246,72 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
     sql(`SELECT status FROM insight_signals WHERE tenant_id = ${DEMO}
          AND kind = 'funnel_drop' AND subject = 'view_item_to_add_to_cart'`),
   ).toBe("dismissed");
+
+  await admin.context().close();
+});
+
+test("a published theme change shows the weeks before and after", async ({ browser }) => {
+  const signal = `(SELECT id FROM insight_signals WHERE tenant_id = ${DEMO}
+                   AND kind = 'low_add_to_cart' AND subject = '${weak}')`;
+  const seeded = `tenant_id = ${DEMO} AND created_by = '${MARK}'`;
+  sql(`INSERT INTO ai_theme_runs (tenant_id, base_revision_id, prompt, status, created_by, insight_id)
+       SELECT ${DEMO}, revision_id, 'Show the add to cart button above the fold.', 'accepted',
+              '${MARK}', ${signal}
+       FROM theme_active WHERE tenant_id = ${DEMO}`);
+  sql(`INSERT INTO theme_revisions (tenant_id, number, artifact_id, origin, source_key, change,
+                                    status, created_by, ai_run_id, published_at)
+       SELECT ${DEMO}, (SELECT max(number) + 1 FROM theme_revisions WHERE tenant_id = ${DEMO}),
+              r.artifact_id, 'custom', 'e2e/insights.tar.gz', 'ai', 'superseded', '${MARK}', run.id,
+              (current_date - 20) + time '12:00'
+       FROM theme_active a JOIN theme_revisions r ON r.id = a.revision_id
+       JOIN ai_theme_runs run ON run.tenant_id = a.tenant_id AND run.created_by = '${MARK}'
+       WHERE a.tenant_id = ${DEMO}`);
+  sql(`UPDATE ai_theme_runs SET revision_id = (SELECT id FROM theme_revisions WHERE ${seeded})
+       WHERE ${seeded}`);
+  const number = sql(`SELECT number FROM theme_revisions WHERE ${seeded}`);
+  productViews(weak, 2_000, 20, BEFORE);
+  productViews(weak, 2_500, 75, AFTER);
+
+  const admin = await signInOwner(browser);
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await admin.goto("/insights");
+  const product = admin
+    .getByRole("list", { name: "Insights" })
+    .getByRole("region", { name: weakName, exact: true });
+  const change = product.getByRole("region", { name: "Before and after the theme change" });
+  await expect(
+    change.getByText(`Theme revision #${number} published on ${day(20)}`, { exact: true }),
+  ).toBeVisible();
+  await expect(change.getByRole("term")).toHaveText([
+    `Before (${day(34)} – ${day(21)})`,
+    `After (${day(19)} – ${day(6)})`,
+  ]);
+  await expect(change.getByRole("definition")).toHaveText([
+    "1% of 2,000 views",
+    "3% of 2,500 views",
+  ]);
+  await expect(product.getByText(`Detected since ${day(1)}`, { exact: true })).toBeVisible();
+  await change.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "insight readout (phone)");
+  await screenshot(admin, "insights-readout-phone");
+  await admin.setViewportSize({ width: 1280, height: 900 });
+  await change.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "insight readout (desktop)");
+  await screenshot(admin, "insights-readout-desktop");
+
+  sql(
+    `UPDATE theme_revisions SET published_at = (current_date - 3) + time '12:00' WHERE ${seeded}`,
+  );
+  await admin.reload();
+  await expect(change.getByRole("term").last()).toHaveText(`After (${day(2)} – ${day(-11)})`);
+  await expect(change.getByRole("definition").last()).toHaveText(`Collecting until ${day(-11)}`);
+
+  sql(`UPDATE insight_signals SET status = 'resolved' WHERE id = ${signal}`);
+  await admin.reload();
+  await expect(product.getByText("No longer detected", { exact: true })).toBeVisible();
+  await expect(product.getByText(`Last detected on ${day(1)}`, { exact: true })).toBeVisible();
+  await expect(product.getByText(/^Detected since/)).toHaveCount(0);
+  await expect(change).toBeVisible();
 
   await admin.context().close();
 });
