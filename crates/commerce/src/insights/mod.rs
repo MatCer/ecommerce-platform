@@ -365,6 +365,7 @@ struct Target {
     id: Uuid,
     detection: Value,
     product_name: Option<String>,
+    score: f64,
 }
 
 fn facts(d: &Detection, product: Option<&str>, locale: &str) -> Value {
@@ -508,7 +509,8 @@ async fn run_locked(
         r#"SELECT id, detection,
                   CASE WHEN kind = 'low_add_to_cart'
                        THEN insight_product_name((detection->>'product_id')::uuid) END
-                      AS product_name
+                      AS product_name,
+                  score
            FROM insight_signals WHERE status = 'open' AND hypothesis_at IS NULL
            ORDER BY score DESC, kind COLLATE "C", subject COLLATE "C" LIMIT $1"#,
         DAILY_MODEL_CALLS
@@ -554,12 +556,13 @@ async fn run_locked(
             Ok(((text, prompt), model)) => {
                 sqlx::query!(
                     "UPDATE insight_signals SET hypothesis = $2, theme_prompt = $3,
-                            hypothesis_model = $4, hypothesis_at = now()
+                            hypothesis_model = $4, hypothesis_at = now(), hypothesis_score = $5
                      WHERE id = $1 AND hypothesis_at IS NULL",
                     t.id,
                     text,
                     prompt,
-                    model
+                    model,
+                    t.score
                 )
                 .execute(&mut *tx)
                 .await?;
@@ -574,10 +577,12 @@ async fn run_locked(
             Err(e) => {
                 tracing::warn!(%tenant, signal = %t.id, code = e.code(), "insight hypothesis rejected");
                 sqlx::query!(
-                    "UPDATE insight_signals SET hypothesis_error = $2, hypothesis_at = now()
+                    "UPDATE insight_signals SET hypothesis_error = $2, hypothesis_at = now(),
+                                                hypothesis_score = $3
                      WHERE id = $1 AND hypothesis_at IS NULL",
                     t.id,
-                    e.code()
+                    e.code(),
+                    t.score
                 )
                 .execute(&mut *tx)
                 .await?;

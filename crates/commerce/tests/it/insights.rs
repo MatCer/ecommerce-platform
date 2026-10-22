@@ -642,7 +642,7 @@ async fn calls_whose_results_were_lost_still_count_toward_the_daily_cap(db: PgPo
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query(
         "UPDATE insight_signals SET hypothesis = NULL, theme_prompt = NULL,
-                hypothesis_model = NULL, hypothesis_at = NULL",
+                hypothesis_model = NULL, hypothesis_at = NULL, hypothesis_score = NULL",
     )
     .execute(&mut *tx)
     .await

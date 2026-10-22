@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, detection,\n                  CASE WHEN kind = 'low_add_to_cart'\n                       THEN insight_product_name((detection->>'product_id')::uuid) END\n                      AS product_name\n           FROM insight_signals WHERE status = 'open' AND hypothesis_at IS NULL\n           ORDER BY score DESC, kind COLLATE \"C\", subject COLLATE \"C\" LIMIT $1",
+  "query": "SELECT id, detection,\n                  CASE WHEN kind = 'low_add_to_cart'\n                       THEN insight_product_name((detection->>'product_id')::uuid) END\n                      AS product_name,\n                  score\n           FROM insight_signals WHERE status = 'open' AND hypothesis_at IS NULL\n           ORDER BY score DESC, kind COLLATE \"C\", subject COLLATE \"C\" LIMIT $1",
   "describe": {
     "columns": [
       {
@@ -30,6 +30,17 @@
         "name": "product_name",
         "type_info": "Text",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "score"
+          }
+        }
       }
     ],
     "parameters": {
@@ -40,8 +51,9 @@
     "nullable": [
       false,
       false,
-      null
+      null,
+      false
     ]
   },
-  "hash": "22f3ce8501fbe1d896b2d24a0d5602fca83bd8eda6e2bfa4cecf309a882f58fc"
+  "hash": "507c4e6626efec01d9942e412339de81dd70fee9564bd1bbfff297626ae3adce"
 }

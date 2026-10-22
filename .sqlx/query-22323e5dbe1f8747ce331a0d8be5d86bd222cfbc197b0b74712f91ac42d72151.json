@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE insight_signals SET hypothesis = $2, theme_prompt = $3,\n                            hypothesis_model = $4, hypothesis_at = now(), hypothesis_score = $5\n                     WHERE id = $1 AND hypothesis_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "22323e5dbe1f8747ce331a0d8be5d86bd222cfbc197b0b74712f91ac42d72151"
+}
