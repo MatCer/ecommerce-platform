@@ -189,6 +189,12 @@ async fn page_urls(fetch: &SafeClient, site: &Url, deadline: Instant, c: &mut Cr
             }
             Ok(Sitemap::Urls(locs)) => {
                 for u in resolve(locs) {
+                    if u.path().to_ascii_lowercase().ends_with(".xml")
+                        && let Some(hint) = feed_at(&u)
+                    {
+                        c.site.feed.get_or_insert(hint);
+                        continue;
+                    }
                     if u.path() == "/" || !seen.insert(u.clone()) {
                         continue;
                     }
@@ -598,22 +604,27 @@ fn shop_brand(scan: &Scan, home: &Url) -> (Option<String>, Option<Url>) {
 
 fn feed_hint(scan: &Scan, home: &Url) -> Option<FeedHint> {
     scan.hrefs.iter().find_map(|h| {
-        let u = resolve(home, h).filter(|u| same_site(u, home))?;
-        let s = format!("{}?{}", u.path(), u.query().unwrap_or_default()).to_lowercase();
-        if !["xml", "feed", "export"].iter().any(|k| s.contains(k)) {
-            return None;
-        }
-        let source = if s.contains("heureka") || s.contains("zbozi") {
-            Source::Heureka
-        } else if s.contains("google") || s.contains("merchant") {
-            Source::Google
-        } else {
-            return None;
-        };
-        Some(FeedHint {
-            url: u.into(),
-            source,
-        })
+        resolve(home, h)
+            .filter(|u| same_site(u, home))
+            .and_then(|u| feed_at(&u))
+    })
+}
+
+fn feed_at(u: &Url) -> Option<FeedHint> {
+    let s = format!("{}?{}", u.path(), u.query().unwrap_or_default()).to_lowercase();
+    if !["xml", "feed", "export"].iter().any(|k| s.contains(k)) {
+        return None;
+    }
+    let source = if s.contains("heureka") || s.contains("zbozi") {
+        Source::Heureka
+    } else if s.contains("google") || s.contains("merchant") {
+        Source::Google
+    } else {
+        return None;
+    };
+    Some(FeedHint {
+        url: u.to_string(),
+        source,
     })
 }
 

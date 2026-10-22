@@ -525,3 +525,38 @@ async fn one_store_import_at_a_time(db: PgPool) {
         RunStatus::Analyzed
     );
 }
+
+#[tokio::test]
+async fn a_feed_listed_only_in_the_sitemap_is_hinted() {
+    let hits: Arc<Mutex<HashMap<String, usize>>> = Arc::default();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://localhost:{}", listener.local_addr().unwrap().port());
+    let (site, seen) = (base.clone(), hits.clone());
+    let app = Router::new().fallback(move |uri: Uri| {
+        *seen.lock().unwrap().entry(uri.path().to_owned()).or_default() += 1;
+        let body = match uri.path() {
+            "/" => "<title>Stará Kočka</title>".to_owned(),
+            "/sitemap.xml" => format!(
+                "<urlset><url><loc>{site}/one/</loc></url><url><loc>{site}/export/heureka.xml</loc></url></urlset>"
+            ),
+            "/one/" => product_page("SK-ONE", "/images/demo/x.jpg"),
+            _ => String::new(),
+        };
+        async move { body }
+    });
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let fetch = SafeClient::new(["localhost".to_owned()]).unwrap();
+
+    let crawl = commerce::feeds::store::crawl(&fetch, &format!("{base}/"))
+        .await
+        .unwrap();
+
+    let feed = crawl.site.feed.expect("the sitemap's feed is hinted");
+    assert_eq!(
+        (feed.source, feed.url),
+        (Source::Heureka, format!("{base}/export/heureka.xml"))
+    );
+    assert_eq!(crawl.items.len(), 1);
+    assert_eq!(crawl.site.product_urls, 1);
+    assert_eq!(hits.lock().unwrap().get("/export/heureka.xml"), None);
+}
