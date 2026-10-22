@@ -19,6 +19,15 @@ use crate::storefront::Context;
 use crate::storefront::pages::{self, HeroCopy, HomePage};
 use crate::themes;
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the readout and guardrails call it from the next pass"
+    )
+)]
+mod stats;
+
 /// The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ExperimentRef {
