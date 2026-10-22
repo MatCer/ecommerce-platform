@@ -5035,6 +5035,286 @@
         ]
       }
     },
+    "/admin/v1/experiments": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "The newest 100 experiments (owner/admin).",
+        "operationId": "list_experiments",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentList"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Creates a draft that splits visitors 50/50 between the shop as it is (`control`) and the\nchange (`variant`), as the next version of its name (owner/admin). Honors\n`Idempotency-Key`.",
+        "operationId": "create_experiment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewExperiment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Experiment"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "experiment_exists, idempotency_conflict, idempotency_in_progress",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_body, invalid_experiment_name, invalid_experiment_config, unknown_theme_revision, theme_revision_not_ready",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/experiments/{id}": {
+      "get": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "An experiment and, once it started, its readout as of the last UTC midnight\n(owner/admin).",
+        "operationId": "get_experiment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/experiments/{id}/promote": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Makes the variant the shop's own (owner/admin, login at most 15 minutes old): publishes\nits theme revision or stores its hero copy, and stops the experiment if it still runs. An\nexperiment promoted before is returned as it is.",
+        "operationId": "promote_experiment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Experiment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "reauth_required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "experiment_not_started, experiment_not_promotable, not_publishable, ai_run_not_accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/experiments/{id}/start": {
       "post": {
         "tags": [
@@ -5086,7 +5366,7 @@
             }
           },
           "409": {
-            "description": "experiment_not_draft, experiment_running",
+            "description": "experiment_not_draft, experiment_running, theme_revision_not_ready",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5097,6 +5377,74 @@
           },
           "422": {
             "description": "cookie_policy_outdated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/experiments/{id}/stop": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Stops a running experiment (owner/admin); an experiment that already stopped stays as it\nis. Its readout keeps counting the purchases of its last week of visitors.",
+        "operationId": "stop_experiment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Stopped"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "experiment_not_running",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -23545,6 +23893,54 @@
           }
         }
       },
+      "ArmReadout": {
+        "type": "object",
+        "required": [
+          "assigned",
+          "subjects",
+          "converters",
+          "p_best",
+          "expected_loss"
+        ],
+        "properties": {
+          "assigned": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Subjects assigned before the snapshot.",
+            "minimum": 0
+          },
+          "conversion_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "`converters / subjects`; null without subjects."
+          },
+          "converters": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Counted subjects who bought within 7 days of their assignment.",
+            "minimum": 0
+          },
+          "expected_loss": {
+            "type": "number",
+            "format": "double",
+            "description": "The conversion rate lost, in expectation, by keeping this arm."
+          },
+          "p_best": {
+            "type": "number",
+            "format": "double",
+            "description": "The chance that this arm converts best."
+          },
+          "subjects": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Assigned subjects whose 7-day attribution window has closed; only they are counted.",
+            "minimum": 0
+          }
+        }
+      },
       "Asset": {
         "type": "object",
         "required": [
@@ -24225,6 +24621,14 @@
             "type": "string"
           }
         }
+      },
+      "Basis": {
+        "type": "string",
+        "description": "Why a readout shows no difference.",
+        "enum": [
+          "equivalent",
+          "ended"
+        ]
       },
       "Block": {
         "oneOf": [
@@ -28184,6 +28588,170 @@
         },
         "additionalProperties": false
       },
+      "Experiment": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "status",
+          "change",
+          "created_at"
+        ],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/ExperimentChange"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "promoted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the variant became the shop's own: at its stop, or after it."
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExperimentStatus"
+          },
+          "stop_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StopReason",
+                "description": "Set exactly when `status` is `stopped`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stopped_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ExperimentChange": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "hero",
+              "kind"
+            ],
+            "properties": {
+              "hero": {
+                "$ref": "#/components/schemas/HeroCopy"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "hero"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "revision_id",
+              "revision_number",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "theme"
+                ]
+              },
+              "revision_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "revision_number": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Theme code renders the arm (`experimentArm()`); it can be stopped, not promoted.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "component"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ExperimentDetail": {
+        "type": "object",
+        "description": "An experiment and its readout; a draft has none.",
+        "required": [
+          "experiment"
+        ],
+        "properties": {
+          "experiment": {
+            "$ref": "#/components/schemas/Experiment"
+          },
+          "readout": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Readout"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExperimentList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experiment"
+            }
+          }
+        }
+      },
       "ExperimentRef": {
         "type": "object",
         "description": "The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.",
@@ -28217,6 +28785,14 @@
             "format": "int32"
           }
         }
+      },
+      "ExperimentStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "running",
+          "stopped"
+        ]
       },
       "Explained": {
         "type": "object",
@@ -29215,6 +29791,43 @@
             "type": "string"
           }
         }
+      },
+      "HeroCopy": {
+        "type": "object",
+        "description": "Texts that replace the home hero's: an experiment arm's `config.hero`, and the copy a promoted\narm leaves on the home page.",
+        "properties": {
+          "cta": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BTreeMap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtitle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BTreeMap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BTreeMap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "HomePage": {
         "type": "object",
@@ -31107,6 +31720,15 @@
           }
         }
       },
+      "Need": {
+        "type": "string",
+        "description": "Why a readout is still collecting.",
+        "enum": [
+          "time",
+          "converters",
+          "evidence"
+        ]
+      },
       "NewCategory": {
         "type": "object",
         "required": [
@@ -31137,6 +31759,49 @@
         },
         "additionalProperties": false
       },
+      "NewChange": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "hero",
+              "kind"
+            ],
+            "properties": {
+              "hero": {
+                "$ref": "#/components/schemas/HeroCopy"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "hero"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A ready, published or superseded revision of the shop's theme that has its artifact.",
+            "required": [
+              "revision_id",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "theme"
+                ]
+              },
+              "revision_id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "description": "What the variant arm changes; the control arm is the shop as it is."
+      },
       "NewDataImport": {
         "type": "object",
         "required": [
@@ -31164,6 +31829,22 @@
           }
         },
         "additionalProperties": false
+      },
+      "NewExperiment": {
+        "type": "object",
+        "required": [
+          "name",
+          "change"
+        ],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/NewChange"
+          },
+          "name": {
+            "type": "string",
+            "description": "`^[a-z0-9][a-z0-9_-]{0,63}$`; a name used before gets its next version."
+          }
+        }
       },
       "NewImport": {
         "type": "object",
@@ -34532,6 +35213,111 @@
           }
         }
       },
+      "Readout": {
+        "type": "object",
+        "description": "The daily snapshot of a started experiment.",
+        "required": [
+          "as_of",
+          "final",
+          "min_converters",
+          "state",
+          "control",
+          "variant"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The UTC midnight the snapshot counts up to; once stopped, at most the stop plus 7 days."
+          },
+          "control": {
+            "$ref": "#/components/schemas/ArmReadout"
+          },
+          "decides_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The first snapshot that can name a winner or no difference; absent when the experiment\nstopped less than 14 days after its start, so it can never decide."
+          },
+          "final": {
+            "type": "boolean",
+            "description": "Stopped, and every attribution window has closed."
+          },
+          "min_converters": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The converters each arm needs before the readout decides.",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/ReadoutState"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/ArmReadout"
+          }
+        }
+      },
+      "ReadoutState": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "need",
+              "state"
+            ],
+            "properties": {
+              "need": {
+                "$ref": "#/components/schemas/Need"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "collecting"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "arm",
+              "state"
+            ],
+            "properties": {
+              "arm": {
+                "$ref": "#/components/schemas/Side"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "winner"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "basis",
+              "state"
+            ],
+            "properties": {
+              "basis": {
+                "$ref": "#/components/schemas/Basis"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "no_difference"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What the daily snapshot shows. It is recomputed every day, so a winner can disappear."
+      },
       "RebuildQueued": {
         "type": "object",
         "required": [
@@ -36700,6 +37486,14 @@
           }
         }
       },
+      "Side": {
+        "type": "string",
+        "description": "An arm of a two-arm experiment.",
+        "enum": [
+          "control",
+          "variant"
+        ]
+      },
       "SignInResult": {
         "type": "object",
         "required": [
@@ -36935,6 +37729,16 @@
           "low_stock",
           "backorder",
           "out_of_stock"
+        ]
+      },
+      "StopReason": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "promoted",
+          "srm",
+          "harm",
+          "max_duration"
         ]
       },
       "StorefrontToken": {
@@ -38827,7 +39631,7 @@
     },
     {
       "name": "experiments",
-      "description": "Admin API: starting an A/B experiment, gated on the cookie page wording"
+      "description": "Admin API: A/B experiments (create, start, stop, read the readout, promote)"
     },
     {
       "name": "insights",

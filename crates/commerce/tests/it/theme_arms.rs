@@ -16,7 +16,7 @@ fn arms(keys: &[&str]) -> Value {
         .collect()
 }
 
-async fn artifact(db: &PgPool, id: &str) {
+pub(crate) async fn artifact(db: &PgPool, id: &str) {
     sqlx::query("INSERT INTO platform.theme_artifacts (id, kind) VALUES ($1, 'theme')")
         .bind(id)
         .execute(db)
@@ -24,7 +24,7 @@ async fn artifact(db: &PgPool, id: &str) {
         .unwrap();
 }
 
-async fn revision(
+pub(crate) async fn revision(
     runtime: &PgPool,
     tenant: Uuid,
     number: i32,
@@ -127,7 +127,7 @@ async fn resolve_names_the_running_experiment_and_its_theme_arm(db: PgPool) {
     exec(
         &runtime,
         shop.tenant,
-        "UPDATE experiments SET status = 'stopped' WHERE id = $1",
+        "UPDATE experiments SET status = 'stopped', stop_reason = 'manual' WHERE id = $1",
         copy,
     )
     .await
@@ -365,7 +365,7 @@ async fn a_running_theme_arm_keeps_its_artifact_through_gc(db: PgPool) {
     exec(
         &runtime,
         tenant,
-        "UPDATE experiments SET status = 'stopped' WHERE id = $1",
+        "UPDATE experiments SET status = 'stopped', stop_reason = 'manual' WHERE id = $1",
         id,
     )
     .await

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO home_settings (tenant_id, hero) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET hero = home_settings.hero || EXCLUDED.hero",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "df78bdd6bff952c9a91d6cfc0184cd467402aa82e11f7f8c1daedda349c14f83"
+}

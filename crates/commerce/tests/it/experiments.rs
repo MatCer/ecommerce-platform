@@ -15,20 +15,20 @@ fn key() -> ExperimentKey {
     ExperimentKey::new(b"test-experiments-secret-0123456789abcdef")
 }
 
-async fn setup(db: &PgPool, slug: &str) -> (PgPool, Uuid) {
+pub(crate) async fn setup(db: &PgPool, slug: &str) -> (PgPool, Uuid) {
     let runtime = testkit::runtime_pool(db, 4).await;
     let (tenant, _) = testkit::tenant(&runtime, slug).await;
     (runtime, tenant)
 }
 
-fn arms(weights: &[(&str, u32)]) -> serde_json::Value {
+pub(crate) fn arms(weights: &[(&str, u32)]) -> serde_json::Value {
     weights
         .iter()
         .map(|(k, w)| json!({"key": k, "weight": w, "config": {}}))
         .collect()
 }
 
-async fn draft(runtime: &PgPool, tenant: Uuid, name: &str, version: i32) -> Uuid {
+pub(crate) async fn draft(runtime: &PgPool, tenant: Uuid, name: &str, version: i32) -> Uuid {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let id = sqlx::query_scalar(
         "INSERT INTO experiments (tenant_id, name, version, arms) VALUES ($1, $2, $3, $4)
@@ -45,7 +45,7 @@ async fn draft(runtime: &PgPool, tenant: Uuid, name: &str, version: i32) -> Uuid
     id
 }
 
-async fn update(
+pub(crate) async fn update(
     runtime: &PgPool,
     tenant: Uuid,
     sql: &'static str,
@@ -56,14 +56,18 @@ async fn update(
     tx.commit().await
 }
 
-async fn set_status(runtime: &PgPool, tenant: Uuid, id: Uuid, status: &'static str) {
+pub(crate) async fn set_status(runtime: &PgPool, tenant: Uuid, id: Uuid, status: &'static str) {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
-    sqlx::query("UPDATE experiments SET status = $2 WHERE id = $1")
-        .bind(id)
-        .bind(status)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE experiments SET status = $2,
+                stop_reason = CASE WHEN $2 = 'stopped' THEN 'manual' END
+         WHERE id = $1",
+    )
+    .bind(id)
+    .bind(status)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 }
 
@@ -122,13 +126,13 @@ async fn add_paragraph(runtime: &PgPool, tenant: Uuid, id: Uuid, confirmed: bool
     .await
 }
 
-async fn published_cookie_page(runtime: &PgPool, tenant: Uuid) -> Uuid {
+pub(crate) async fn published_cookie_page(runtime: &PgPool, tenant: Uuid) -> Uuid {
     let id = install_cookie_page(runtime, tenant).await;
     publish(runtime, tenant, id, PageStatus::Published).await;
     id
 }
 
-async fn start(runtime: &PgPool, tenant: Uuid, id: Uuid) -> Result<(), Error> {
+pub(crate) async fn start(runtime: &PgPool, tenant: Uuid, id: Uuid) -> Result<(), Error> {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     experiments::start(&mut tx, ACTOR, id).await?;
     tx.commit().await.unwrap();
@@ -151,7 +155,7 @@ fn outdated(result: Result<(), Error>) -> bool {
     )
 }
 
-async fn running(runtime: &PgPool, tenant: Uuid) -> Uuid {
+pub(crate) async fn running(runtime: &PgPool, tenant: Uuid) -> Uuid {
     published_cookie_page(runtime, tenant).await;
     let id = draft(runtime, tenant, "homepage", 1).await;
     start(runtime, tenant, id).await.unwrap();

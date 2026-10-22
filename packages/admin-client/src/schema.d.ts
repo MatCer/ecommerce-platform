@@ -1108,6 +1108,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/experiments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The newest 100 experiments (owner/admin). */
+        get: operations["list_experiments"];
+        put?: never;
+        /**
+         * Creates a draft that splits visitors 50/50 between the shop as it is (`control`) and the
+         *     change (`variant`), as the next version of its name (owner/admin). Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["create_experiment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/experiments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An experiment and, once it started, its readout as of the last UTC midnight
+         *     (owner/admin).
+         */
+        get: operations["get_experiment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/experiments/{id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Makes the variant the shop's own (owner/admin, login at most 15 minutes old): publishes
+         *     its theme revision or stores its hero copy, and stops the experiment if it still runs. An
+         *     experiment promoted before is returned as it is.
+         */
+        post: operations["promote_experiment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/experiments/{id}/start": {
         parameters: {
             query?: never;
@@ -1123,6 +1186,26 @@ export interface paths {
          *     analytics covers testing page variants.
          */
         post: operations["start_experiment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/experiments/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stops a running experiment (owner/admin); an experiment that already stopped stays as it
+         *     is. Its readout keeps counting the purchases of its last week of visitors.
+         */
+        post: operations["stop_experiment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5191,6 +5274,38 @@ export interface components {
             /** Format: uuid */
             next_cursor?: string | null;
         };
+        ArmReadout: {
+            /**
+             * Format: int64
+             * @description Subjects assigned before the snapshot.
+             */
+            assigned: number;
+            /**
+             * Format: double
+             * @description `converters / subjects`; null without subjects.
+             */
+            conversion_rate?: number | null;
+            /**
+             * Format: int64
+             * @description Counted subjects who bought within 7 days of their assignment.
+             */
+            converters: number;
+            /**
+             * Format: double
+             * @description The conversion rate lost, in expectation, by keeping this arm.
+             */
+            expected_loss: number;
+            /**
+             * Format: double
+             * @description The chance that this arm converts best.
+             */
+            p_best: number;
+            /**
+             * Format: int64
+             * @description Assigned subjects whose 7-day attribution window has closed; only they are counted.
+             */
+            subjects: number;
+        };
         Asset: {
             /** Format: int64 */
             bytes?: number | null;
@@ -5387,6 +5502,11 @@ export interface components {
             qr_svg?: string | null;
             variable_symbol: string;
         };
+        /**
+         * @description Why a readout shows no difference.
+         * @enum {string}
+         */
+        Basis: "equivalent" | "ended";
         /** @description One block of a page. `type` selects the variant. */
         Block: {
             /** Format: int32 */
@@ -6586,6 +6706,50 @@ export interface components {
             confirm_email: string;
             email: string;
         };
+        Experiment: {
+            change: components["schemas"]["ExperimentChange"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /**
+             * Format: date-time
+             * @description When the variant became the shop's own: at its stop, or after it.
+             */
+            promoted_at?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: components["schemas"]["ExperimentStatus"];
+            stop_reason?: components["schemas"]["StopReason"] | null;
+            /** Format: date-time */
+            stopped_at?: string | null;
+            /** Format: int32 */
+            version: number;
+        };
+        ExperimentChange: {
+            hero: components["schemas"]["HeroCopy"];
+            /** @enum {string} */
+            kind: "hero";
+        } | {
+            /** @enum {string} */
+            kind: "theme";
+            /** Format: uuid */
+            revision_id: string;
+            /** Format: int32 */
+            revision_number: number;
+        } | {
+            /** @enum {string} */
+            kind: "component";
+        };
+        /** @description An experiment and its readout; a draft has none. */
+        ExperimentDetail: {
+            experiment: components["schemas"]["Experiment"];
+            readout?: components["schemas"]["Readout"] | null;
+        };
+        ExperimentList: {
+            items: components["schemas"]["Experiment"][];
+        };
         /** @description The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`. */
         ExperimentRef: {
             /** Format: uuid */
@@ -6596,6 +6760,8 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        /** @enum {string} */
+        ExperimentStatus: "draft" | "running" | "stopped";
         Explained: {
             /** @description The strategies tried, in order. */
             chain: components["schemas"]["Strategy"][];
@@ -6883,6 +7049,15 @@ export interface components {
             image?: components["schemas"]["Image"] | null;
             subtitle: string;
             title: string;
+        };
+        /**
+         * @description Texts that replace the home hero's: an experiment arm's `config.hero`, and the copy a promoted
+         *     arm leaves on the home page.
+         */
+        HeroCopy: {
+            cta?: components["schemas"]["BTreeMap"] | null;
+            subtitle?: components["schemas"]["BTreeMap"] | null;
+            title?: components["schemas"]["BTreeMap"] | null;
         };
         HomePage: {
             cache: components["schemas"]["CacheHints"];
@@ -7510,6 +7685,11 @@ export interface components {
             /** Format: uuid */
             next_cursor?: string | null;
         };
+        /**
+         * @description Why a readout is still collecting.
+         * @enum {string}
+         */
+        Need: "time" | "converters" | "evidence";
         NewCategory: {
             /** Format: uuid */
             image_asset_id?: string | null;
@@ -7519,6 +7699,17 @@ export interface components {
              */
             parent_id?: string | null;
             translations: components["schemas"]["CategoryTranslation"][];
+        };
+        /** @description What the variant arm changes; the control arm is the shop as it is. */
+        NewChange: {
+            hero: components["schemas"]["HeroCopy"];
+            /** @enum {string} */
+            kind: "hero";
+        } | {
+            /** @enum {string} */
+            kind: "theme";
+            /** Format: uuid */
+            revision_id: string;
         };
         NewDataImport: {
             kind: components["schemas"]["DataImportKind"];
@@ -7533,6 +7724,11 @@ export interface components {
              * @description Bytes of the CSV (at most 20 MB) to upload with the returned presigned PUT.
              */
             upload_size: number;
+        };
+        NewExperiment: {
+            change: components["schemas"]["NewChange"];
+            /** @description `^[a-z0-9][a-z0-9_-]{0,63}$`; a name used before gets its next version. */
+            name: string;
         };
         NewImport: {
             /** @description Publish new products right away instead of creating drafts (the default, A28). */
@@ -8619,6 +8815,44 @@ export interface components {
              */
             status: components["schemas"]["CheckStatus"];
         };
+        /** @description The daily snapshot of a started experiment. */
+        Readout: {
+            /**
+             * Format: date-time
+             * @description The UTC midnight the snapshot counts up to; once stopped, at most the stop plus 7 days.
+             */
+            as_of: string;
+            control: components["schemas"]["ArmReadout"];
+            /**
+             * Format: date-time
+             * @description The first snapshot that can name a winner or no difference; absent when the experiment
+             *     stopped less than 14 days after its start, so it can never decide.
+             */
+            decides_from?: string | null;
+            /** @description Stopped, and every attribution window has closed. */
+            final: boolean;
+            /**
+             * Format: int64
+             * @description The converters each arm needs before the readout decides.
+             */
+            min_converters: number;
+            state: components["schemas"]["ReadoutState"];
+            variant: components["schemas"]["ArmReadout"];
+        };
+        /** @description What the daily snapshot shows. It is recomputed every day, so a winner can disappear. */
+        ReadoutState: {
+            need: components["schemas"]["Need"];
+            /** @enum {string} */
+            state: "collecting";
+        } | {
+            arm: components["schemas"]["Side"];
+            /** @enum {string} */
+            state: "winner";
+        } | {
+            basis: components["schemas"]["Basis"];
+            /** @enum {string} */
+            state: "no_difference";
+        };
         RebuildQueued: {
             /** Format: int64 */
             job_id: number;
@@ -9314,6 +9548,11 @@ export interface components {
             tracking: components["schemas"]["Tracking"];
             trust: components["schemas"]["Trust"];
         };
+        /**
+         * @description An arm of a two-arm experiment.
+         * @enum {string}
+         */
+        Side: "control" | "variant";
         SignInResult: {
             customer: components["schemas"]["CustomerView"];
             /** @description Relative path on the checkout origin to continue to. */
@@ -9399,6 +9638,8 @@ export interface components {
         };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
+        /** @enum {string} */
+        StopReason: "manual" | "promoted" | "srm" | "harm" | "max_duration";
         StorefrontToken: {
             /**
              * @description Public storefront token of the tenant (the edge sends it; it grants only public reads
@@ -13007,6 +13248,188 @@ export interface operations {
             };
         };
     };
+    list_experiments: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExperimentList"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_experiment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewExperiment"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Experiment"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description experiment_exists, idempotency_conflict, idempotency_in_progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_body, invalid_experiment_name, invalid_experiment_config, unknown_theme_revision, theme_revision_not_ready */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_experiment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExperimentDetail"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    promote_experiment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Experiment"];
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description experiment_not_started, experiment_not_promotable, not_publishable, ai_run_not_accepted */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     start_experiment: {
         parameters: {
             query?: never;
@@ -13044,7 +13467,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description experiment_not_draft, experiment_running */
+            /** @description experiment_not_draft, experiment_running, theme_revision_not_ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13055,6 +13478,54 @@ export interface operations {
             };
             /** @description cookie_policy_outdated */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    stop_experiment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description experiment_not_running */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

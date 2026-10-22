@@ -153,7 +153,7 @@ pub struct MailEvents {
         (name = "portability", description = "Admin API: CSV imports, archived orders, data exports, GDPR access and erasure"),
         (name = "email", description = "Admin API: sent emails, suppressions, email logo and texts"),
         (name = "reviews", description = "Admin API: review moderation (publish, reject, hide) and replies"),
-        (name = "experiments", description = "Admin API: starting an A/B experiment, gated on the cookie page wording"),
+        (name = "experiments", description = "Admin API: A/B experiments (create, start, stop, read the readout, promote)"),
         (name = "insights", description = "Admin API: ranked findings of the nightly detectors, with optional AI hypotheses"),
         (name = "webhooks", description = "Provider webhooks: payments (signed), email bounces/complaints"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),

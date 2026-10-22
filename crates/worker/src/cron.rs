@@ -96,6 +96,11 @@ pub const SCHEDULES: &[Schedule] = &[
         every: Duration::from_secs(3600),
     },
     Schedule {
+        name: "experiments.guardrails",
+        kind: commerce::experiments::GUARDRAILS_JOB,
+        every: Duration::from_secs(3600),
+    },
+    Schedule {
         name: "ops.sweep",
         kind: handlers::SWEEP_JOB,
         every: Duration::from_secs(900),

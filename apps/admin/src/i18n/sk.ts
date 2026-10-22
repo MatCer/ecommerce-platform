@@ -878,6 +878,7 @@ export const sk: Dictionary = {
   },
   nav: {
     themes: "Vzhľad obchodu",
+    experiments: "Experimenty",
     collections: "Kolekcie",
     recommendations: "Odporúčania",
     aiBulk: "Hromadné úpravy s AI",
@@ -1209,6 +1210,21 @@ export const sk: Dictionary = {
     not_dead: "Znova zaradiť možno len neúspešné (mŕtve) úlohy.",
     not_a_superadmin: "Túto akciu môže vykonať len superadministrátor platformy.",
     service_unavailable: "Služba je dočasne nedostupná.",
+    cookie_policy_outdated:
+      "Najprv zverejnite stránku o cookies z aktuálnej právnej šablóny vo všetkých jazykoch trhov.",
+    experiment_running: "Už beží iný experiment. Najprv ho zastavte.",
+    experiment_not_draft: "Spustiť možno len koncept.",
+    experiment_not_running: "Experiment už nebeží.",
+    experiment_not_started: "Experiment najprv spustite.",
+    experiment_not_promotable:
+      "Tento variant je súčasťou kódu vzhľadu a odtiaľto ho nemožno zverejniť.",
+    experiment_exists: "Rovnaký experiment práve vytvoril niekto iný. Skúste to znova.",
+    invalid_experiment_name:
+      "Použite malé písmená, číslice, - a _ (najviac 64 znakov, na začiatku písmeno alebo číslica).",
+    invalid_experiment_config:
+      "Vyplňte aspoň jeden text, každý najviac 200 znakov, v jazykoch vašich trhov.",
+    unknown_theme_revision: "Táto revízia vzhľadu neexistuje.",
+    theme_revision_not_ready: "Táto revízia vzhľadu neprešla kontrolami alebo už bola odstránená.",
   },
   auth: {
     signInTitle: "Prihlásenie",
@@ -2432,5 +2448,118 @@ export const sk: Dictionary = {
       "{{metric}} p75 je {{p75}}, nad hranicou dobrého výsledku {{bound}} ({{samples}} meraní za posledných 14 dní).",
     zero_result_search:
       "{{searches}} vyhľadávaní za posledných 14 dní nenašlo žiadny produkt (všetky jazyky spolu).",
+  },
+  experiments: {
+    title: "Experimenty",
+    intro:
+      "Otestujte nový hlavný text úvodnej stránky alebo revíziu vzhľadu oproti súčasnému obchodu. Zúčastňujú sa len návštevníci, ktorí súhlasili s analytikou.",
+    new: "Nový experiment",
+    emptyTitle: "Zatiaľ žiadne experimenty",
+    emptyBody: "Vytvorte koncept a spustite ho, keď bude stránka o cookies zahŕňať experimenty.",
+    name: "{{name}} · v{{version}}",
+    columns: {
+      name: "Názov",
+      change: "Variant",
+      status: "Stav",
+      started: "Spustené",
+      stopped: "Zastavené",
+    },
+    status: { draft: "Koncept", running: "Beží", stopped: "Zastavené" },
+    change: {
+      hero: "Hlavný text úvodnej stránky",
+      theme: "Revízia vzhľadu #{{number}}",
+      component: "Kód vzhľadu",
+    },
+    stopShort: {
+      manual: "Ručne",
+      promoted: "Variant zverejnený",
+      srm: "Nerovnomerné rozdelenie",
+      harm: "Variant predával menej",
+      max_duration: "Limit 56 dní",
+    },
+    changeTitle: "Čo variant mení",
+    startedOn: "Spustené {{date}}.",
+    promotedOn: "Variant bol zverejnený {{date}}.",
+    form: {
+      title: "Nový experiment",
+      name: "Názov",
+      nameHint: "Malé písmená, číslice, - a _. Rovnaký názov vytvorí jeho ďalšiu verziu.",
+      kind: "Čo variant mení",
+      hero: "Hlavný text úvodnej stránky",
+      theme: "Revízia vzhľadu",
+      heroTitle: "Nadpis",
+      heroSubtitle: "Podnadpis",
+      heroCta: "Text tlačidla",
+      heroHint:
+        "Vyplňte text v každom jazyku, alebo ho všade nechajte prázdny a zostane súčasný text.",
+      heroMissing: "Vyplňte aj tento text, alebo ho nechajte prázdny vo všetkých jazykoch.",
+      revision: "Revízia",
+      noRevisions: "Zatiaľ žiadna revízia vzhľadu neprešla kontrolami.",
+      themesLink: "Otvoriť vzhľad obchodu",
+      submit: "Vytvoriť koncept",
+      created: "Koncept vytvorený",
+    },
+    readout: {
+      title: "Výsledok",
+      asOf: "Údaje do {{date}}.",
+      countedHint:
+        "Započítavajú sa návštevníci priradení aspoň pred 7 dňami; nákup sa počíta do 7 dní od ich prvej návštevy.",
+      caption: "Návštevníci a kupujúci oboch verzií",
+      lossHint:
+        "Očakávaná strata je konverzný pomer v percentuálnych bodoch, o ktorý prídete, ak ponecháte túto verziu a ona je horšia.",
+      control: "Súčasná verzia",
+      variant: "Variant",
+      points: "{{n}} p. b.",
+      columns: {
+        version: "Verzia",
+        assigned: "Návštevníci",
+        counted: "Započítaní",
+        buyers: "Kupujúci",
+        rate: "Konverzný pomer",
+        best: "Šanca, že je lepšia",
+        loss: "Očakávaná strata",
+      },
+    },
+    state: {
+      draft: "Experiment ešte nebeží.",
+      tooEarly: "Zbierajú sa údaje. Prvý výsledok bude k dispozícii najskôr {{date}}.",
+      fewBuyers:
+        "Zbierajú sa údaje. Každá verzia potrebuje aspoň {{min}} kupujúcich, zatiaľ ich má súčasná verzia {{control}} a variant {{variant}}.",
+      unclear: "Zbierajú sa údaje. Zatiaľ nie je jasné, ktorá verzia je lepšia.",
+      winnerVariant: "Variant predáva lepšie: s pravdepodobnosťou {{chance}} je to lepšia verzia.",
+      winnerControl:
+        "Súčasná verzia predáva lepšie: s pravdepodobnosťou {{chance}} je to lepšia verzia. Ponechajte ju.",
+      same: "Obe verzie predávajú približne rovnako. Ponechať súčasnú verziu nič nestojí.",
+      noWinner: "Experiment sa skončil bez jasného rozdielu. Ponechajte súčasnú verziu.",
+      notEnough: "Experiment sa skončil bez dostatku údajov na rozhodnutie.",
+      untrusted: "Návštevníci neboli rozdelení podľa plánu, výsledkom preto nemožno veriť.",
+    },
+    stopReason: {
+      manual: "Zastavené ručne {{date}}.",
+      promoted: "Zastavené {{date}} pri zverejnení variantu.",
+      srm: "Automaticky zastavené {{date}}, pretože priradenie návštevníkov nezodpovedalo plánovanému rozdeleniu.",
+      harm: "Automaticky zastavené {{date}}, pretože variant s vysokou pravdepodobnosťou znižoval počet nákupov.",
+      max_duration: "Automaticky zastavené {{date}} po dosiahnutí limitu 56 dní.",
+    },
+    actions: {
+      start: "Spustiť",
+      stop: "Zastaviť",
+      promoteTheme: "Zverejniť revíziu #{{number}}",
+      promoteHero: "Použiť text variantu",
+      stopTitle: "Zastaviť experiment?",
+      stopBody:
+        "Všetci návštevníci znova uvidia súčasnú verziu. Zastavený experiment už nemožno znova spustiť.",
+      promoteThemeTitle: "Zverejniť revíziu vzhľadu #{{number}}?",
+      promoteHeroTitle: "Použiť text variantu?",
+      promoteThemeBody: "Odteraz uvidia revíziu vzhľadu #{{number}} všetci návštevníci.",
+      promoteHeroBody: "Odteraz uvidia text variantu na úvodnej stránke všetci návštevníci.",
+      promoteStops: "Experiment sa zastaví.",
+      componentNote:
+        "Tento variant je súčasťou kódu vzhľadu, preto ho odtiaľto nemožno zverejniť. Ak ho chcete ponechať, upravte kód vzhľadu.",
+      started: "Experiment spustený",
+      stopped: "Experiment zastavený",
+      promoted: "Variant zverejnený",
+    },
+    cookieLink: "Otvoriť právne údaje",
   },
 };

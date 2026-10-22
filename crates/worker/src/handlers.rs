@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use commerce::ai::{Ai, Outcome, alt_text, plan, proposals, review_summary};
+use commerce::experiments;
 use commerce::feeds::{export, import};
 use commerce::insights;
 use commerce::media::{self, Processed};
@@ -286,6 +287,7 @@ pub fn all(
         .register(themes::BUILD_JOB, move |_ctx, job| {
             theme_build(job, theme_builder.clone())
         })
+        .register(experiments::GUARDRAILS_JOB, experiment_guardrails)
         .register(themes::MAINTENANCE_JOB, move |ctx, job| {
             theme_maintenance(ctx, job, theme_storage.clone())
         })
@@ -346,6 +348,14 @@ async fn theme_ai_edit(ctx: Ctx, job: Job, storage: Storage, ai: Ai) -> Result<(
         Err(platform::Error::NotFound) => Err(JobError::Permanent("AI run not found".into())),
         Err(e) => Err(JobError::Retry(e.to_string())),
     }
+}
+
+async fn experiment_guardrails(ctx: Ctx, _job: Job) -> Result<(), JobError> {
+    let report = experiments::guardrails(&ctx.db, chrono::Utc::now())
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::info!(?report, "experiment guardrails done");
+    Ok(())
 }
 
 /// Hourly (WP23): stuck builds fail, artifacts nobody references are deleted.

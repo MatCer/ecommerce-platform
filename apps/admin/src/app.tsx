@@ -60,6 +60,7 @@ const CampaignEditor = lazy(() => import("./pages/CampaignEditor.tsx"));
 const Emails = lazy(() => import("./pages/Emails.tsx"));
 const EmailBranding = lazy(() => import("./pages/EmailBranding.tsx"));
 const Themes = lazy(() => import("./pages/Themes.tsx"));
+const Experiments = lazy(() => import("./pages/Experiments.tsx"));
 const Insights = lazy(() => import("./pages/Insights.tsx"));
 const Customers = lazy(() => import("./pages/Customers.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -124,6 +125,8 @@ export function App() {
           <Route path="/content/legal" component={ContentLegal} />
           <Route path="/content/redirects" component={Redirects} />
           <Route path="/themes" component={Themes} />
+          <Route path="/experiments" component={Experiments} />
+          <Route path="/experiments/:id" component={Experiments} />
           <Route path="/imports" component={Imports} />
           <Route path="/imports/:id" component={Imports} />
           <Route path="/data/imports" component={DataImports} />

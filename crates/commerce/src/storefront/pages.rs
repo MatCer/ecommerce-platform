@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use platform::Error;
 use platform::db::TenantTx;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -18,6 +18,10 @@ use super::{
     Alternate, CacheHints, Context, Link, Search, Seo, alternates, locale_path, messages,
     plain_excerpt,
 };
+use crate::catalog::{I18n, check_i18n};
+use crate::checkout::i18n_text;
+use crate::experiments;
+use crate::markets::invalid;
 use crate::media::AssetVariant;
 use crate::money::MoneyView;
 use crate::recommendations::Strategy;
@@ -335,6 +339,67 @@ pub struct HomePage {
     pub cache: CacheHints,
 }
 
+/// Texts that replace the home hero's: an experiment arm's `config.hero`, and the copy a promoted
+/// arm leaves on the home page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeroCopy {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<I18n>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subtitle: Option<I18n>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cta: Option<I18n>,
+}
+
+impl HeroCopy {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        let fields = [
+            ("hero title", &self.title),
+            ("hero subtitle", &self.subtitle),
+            ("hero cta", &self.cta),
+        ];
+        if fields.iter().all(|(_, texts)| texts.is_none()) {
+            return Err(invalid(
+                experiments::CONFIG,
+                "the hero copy needs a title, a subtitle or a call to action",
+            ));
+        }
+        for (field, texts) in fields {
+            if let Some(texts) = texts {
+                check_i18n(field, experiments::CONFIG, texts, 200, true)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn apply(&self, ctx: &Context, home: &mut HomePage) {
+        let text = |t: &Option<I18n>| t.as_ref().and_then(|t| i18n_text(ctx, t));
+        if let Some(t) = text(&self.title) {
+            home.hero.title = t;
+        }
+        if let Some(t) = text(&self.subtitle) {
+            home.hero.subtitle = t;
+        }
+        if let Some(t) = text(&self.cta) {
+            home.hero.cta.label = t;
+        }
+    }
+}
+
+pub(crate) async fn merge_hero(tx: &mut TenantTx, hero: &HeroCopy) -> Result<(), Error> {
+    let hero = serde_json::to_value(hero).map_err(|e| Error::Internal(e.to_string()))?;
+    sqlx::query!(
+        "INSERT INTO home_settings (tenant_id, hero) VALUES ($1, $2)
+         ON CONFLICT (tenant_id) DO UPDATE SET hero = home_settings.hero || EXCLUDED.hero",
+        tx.tenant_id(),
+        hero
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 fn image_from(variants: &Value, alt: &str) -> Option<Image> {
     let v: Vec<AssetVariant> = serde_json::from_value(variants.clone()).ok()?;
     super::images::from_variants(&v, alt.to_owned())
@@ -392,7 +457,7 @@ pub async fn home(tx: &mut TenantTx, ctx: &Context) -> Result<HomePage, Error> {
     let tags = std::iter::once("home".to_owned())
         .chain(featured.iter().map(|c| format!("product:{}", c.id)))
         .collect();
-    Ok(HomePage {
+    let mut page = HomePage {
         hero: Hero {
             title: t(ctx, "home.hero_title"),
             subtitle: ctx.shop_name.clone(),
@@ -422,7 +487,16 @@ pub async fn home(tx: &mut TenantTx, ctx: &Context) -> Result<HomePage, Error> {
             robots: None,
         },
         cache: CacheHints::public(60, tags),
-    })
+    };
+    if let Some(hero) = sqlx::query_scalar!("SELECT hero FROM home_settings")
+        .fetch_optional(&mut **tx)
+        .await?
+    {
+        serde_json::from_value::<HeroCopy>(hero)
+            .map_err(|e| Error::Internal(format!("home_settings.hero: {e}")))?
+            .apply(ctx, &mut page);
+    }
+    Ok(page)
 }
 
 // ---------------------------------------------------------------------------------------
