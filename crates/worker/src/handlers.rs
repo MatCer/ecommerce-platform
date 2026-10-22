@@ -414,8 +414,9 @@ async fn ai_review_summary_backfill(ctx: Ctx, job: Job, ai: Ai) -> Result<(), Jo
         .get("version")
         .and_then(serde_json::Value::as_i64)
         .ok_or_else(|| JobError::Permanent("payload has no version".into()))?;
-    let last = job.attempts >= job.max_attempts;
-    ai_outcome(review_summary::backfill(&ctx.db, &ai, tenant, version, last).await)
+    review_summary::backfill(&ctx.db, &ai, tenant, version)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
 }
 
 async fn ai_alt_text(ctx: Ctx, job: Job, ai: Ai, storage: Storage) -> Result<(), JobError> {

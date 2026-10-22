@@ -1415,6 +1415,134 @@ async fn toggles_while_a_backfill_pass_runs_end_with_current_summaries(db: PgPoo
     );
 }
 
+#[derive(Clone, Copy)]
+enum Fails {
+    Call,
+    Store,
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_product_whose_summary_call_fails_transiently_is_retried_alone(db: PgPool) {
+    failing_product_is_retried_alone(db, Fails::Call).await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_product_whose_summary_store_fails_is_retried_alone(db: PgPool) {
+    failing_product_is_retried_alone(db, Fails::Store).await;
+}
+
+async fn failing_product_is_retried_alone(db: PgPool, fails: Fails) {
+    use axum::http::StatusCode;
+    use axum::response::{IntoResponse, Response};
+    use commerce::ai::Ai;
+    use platform::ai::{Anthropic, Client};
+
+    fn reply(summaries: serde_json::Value) -> Response {
+        let text = json!({ "summaries": summaries });
+        axum::Json(json!({
+            "model": "claude-sonnet-5", "stop_reason": "end_turn",
+            "content": [{ "type": "text", "text": text.to_string() }],
+            "usage": { "input_tokens": 100, "output_tokens": 20 }
+        }))
+        .into_response()
+    }
+
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "retried-alone").await;
+    let other = testkit::catalog::product(&runtime, shop.tenant, "OTHER", 1)
+        .await
+        .id;
+    let mut products = [(shop.product, "Product TEE"), (other, "Product OTHER")];
+    products.sort();
+    let [(invalid, _), (failing, failing_name)] = products;
+    for (product, _) in products {
+        verified_reviews(&runtime, shop.tenant, product, 5).await;
+    }
+    if let Fails::Store = fails {
+        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+            "CREATE SEQUENCE public.summary_store_failures;
+             CREATE FUNCTION public.fail_first_summary_store() RETURNS trigger
+                 LANGUAGE plpgsql SECURITY DEFINER AS $$
+             BEGIN
+                 IF NEW.product_id = '{failing}'
+                    AND nextval('public.summary_store_failures') = 1 THEN
+                     RAISE EXCEPTION 'injected summary store failure';
+                 END IF;
+                 RETURN NEW;
+             END
+             $$;
+             CREATE TRIGGER fail_first_summary_store BEFORE INSERT ON review_summaries
+                 FOR EACH ROW EXECUTE FUNCTION public.fail_first_summary_store();"
+        )))
+        .execute(&db)
+        .await
+        .unwrap();
+    }
+
+    let invalid_calls = Arc::new(AtomicU32::new(0));
+    let failing_calls = Arc::new(AtomicU32::new(0));
+    let app = axum::Router::new().route(
+        "/v1/messages",
+        axum::routing::post({
+            let (invalid_calls, failing_calls) = (invalid_calls.clone(), failing_calls.clone());
+            move |body: String| {
+                let (invalid_calls, failing_calls) = (invalid_calls.clone(), failing_calls.clone());
+                async move {
+                    if !body.contains(failing_name) {
+                        invalid_calls.fetch_add(1, Ordering::SeqCst);
+                        return reply(json!([]));
+                    }
+                    let first = failing_calls.fetch_add(1, Ordering::SeqCst) == 0;
+                    if first && matches!(fails, Fails::Call) {
+                        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                    }
+                    reply(json!([
+                        { "locale": "cs", "summary": "Dobré." },
+                        { "locale": "sk", "summary": "Dobré." }
+                    ]))
+                }
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/", listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let client = Anthropic::new(&url, "sk-test".into(), Duration::from_secs(10), 0).unwrap();
+    let mut extra = worker::handlers::Extra::disabled().unwrap();
+    extra.ai = Ai::fake_with_client(Some(Client::Anthropic(Arc::new(client))));
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            extra,
+        ),
+        fast_config(),
+    );
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert_eq!(
+        (
+            summarized(&runtime, shop.tenant).await.0,
+            invalid_calls.load(Ordering::SeqCst),
+            failing_calls.load(Ordering::SeqCst)
+        ),
+        (
+            vec![(failing, "cs".to_owned()), (failing, "sk".to_owned())],
+            1,
+            2
+        ),
+        "only the failing product {failing} is called again, not {invalid}"
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool) {
     use commerce::ai::settings::{self, AiSettingsChange};

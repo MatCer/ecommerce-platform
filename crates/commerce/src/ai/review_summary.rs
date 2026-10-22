@@ -81,20 +81,14 @@ pub fn job_for_event(
 }
 
 /// Summarizes every qualifying product for switch-on `version`, one pass per tenant at a time.
-/// Returns Done as soon as a later flip of the switch supersedes `version`.
-pub async fn backfill(
-    db: &PgPool,
-    ai: &Ai,
-    tenant: Uuid,
-    version: i64,
-    last_attempt: bool,
-) -> Result<Outcome, Error> {
+/// Stops as soon as a later flip of the switch supersedes `version`.
+pub async fn backfill(db: &PgPool, ai: &Ai, tenant: Uuid, version: i64) -> Result<(), Error> {
     // A session lock on a connection taken out of the pool: if this future is dropped (lease
     // lost, shutdown) the connection closes and the lock goes with it.
     let mut lock = db.acquire().await?.detach();
     loop {
         if !is_current(db, tenant, version).await? {
-            return Ok(Outcome::Done);
+            return Ok(());
         }
         let locked = sqlx::query_scalar!(
             r#"SELECT pg_try_advisory_lock(
@@ -108,37 +102,37 @@ pub async fn backfill(
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    let result = backfill_locked(db, ai, tenant, version, last_attempt).await;
+    let result = backfill_locked(db, ai, tenant, version).await;
     let _ = sqlx::Connection::close(lock).await;
     result
 }
 
-async fn backfill_locked(
-    db: &PgPool,
-    ai: &Ai,
-    tenant: Uuid,
-    version: i64,
-    last_attempt: bool,
-) -> Result<Outcome, Error> {
+async fn backfill_locked(db: &PgPool, ai: &Ai, tenant: Uuid, version: i64) -> Result<(), Error> {
     let products = sqlx::query_scalar!(
         r#"SELECT product_id AS "product_id!" FROM reviews
            WHERE status = 'published' AND verified
            GROUP BY product_id HAVING count(*) >= $1
-           UNION SELECT product_id FROM review_summaries"#,
+           UNION SELECT product_id FROM review_summaries
+           ORDER BY 1"#,
         MIN_REVIEWS
     )
     .fetch_all(&mut *tenant_tx(db, tenant).await?)
     .await?;
-    let mut retry = None;
     for product_id in products {
         if !is_current(db, tenant, version).await? {
-            return Ok(Outcome::Done);
+            return Ok(());
         }
-        if let Outcome::Retry(reason) = run(db, ai, tenant, product_id, last_attempt).await? {
-            retry = Some(reason);
-        }
+        let reason = match run(db, ai, tenant, product_id, false).await {
+            Ok(Outcome::Done) => continue,
+            Ok(Outcome::Retry(reason)) => reason,
+            Err(e) => e.to_string(),
+        };
+        tracing::warn!(%product_id, error = %reason, "review summary handed to its own job");
+        let mut job = new_job(JOB, tenant, json!({ "product_id": product_id }));
+        job.max_attempts -= 1;
+        queue::enqueue(db, &job).await?;
     }
-    Ok(retry.map_or(Outcome::Done, Outcome::Retry))
+    Ok(())
 }
 
 async fn is_current(db: &PgPool, tenant: Uuid, version: i64) -> Result<bool, Error> {

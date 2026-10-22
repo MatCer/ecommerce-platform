@@ -445,12 +445,9 @@ async fn switching_on_refreshes_summaries_that_fell_below_the_minimum_while_off(
     run(&runtime, &ai, &shop).await;
 
     switch(&runtime, &shop, true).await;
-    assert_eq!(
-        review_summary::backfill(&runtime, &ai, shop.tenant, 3, false)
-            .await
-            .unwrap(),
-        Outcome::Done
-    );
+    review_summary::backfill(&runtime, &ai, shop.tenant, 3)
+        .await
+        .unwrap();
     assert!(summaries(&runtime, &shop).await.is_empty());
     assert_eq!(shown(&runtime, &shop, shop.cz).await, None);
 }
