@@ -14,7 +14,8 @@ import { altField, useAiMarks } from "../lib/ai.ts";
 import { api, tenantHeader, unwrap } from "../lib/api.ts";
 import { mediaUrl } from "../lib/config.ts";
 import { tenantKey } from "../lib/me.ts";
-import { CONTENT_LOCALES, move, type ProductMedia } from "../lib/product-form.ts";
+import { altTextLocales, move, type ProductMedia } from "../lib/product-form.ts";
+import { useMarkets } from "../lib/queries.ts";
 import { ACCEPTED_TYPES, type Asset, checkFile, uploadImage } from "../lib/upload.ts";
 
 const statusTone: Record<Asset["status"], Tone> = {
@@ -53,6 +54,7 @@ function MediaRow(props: {
   count: number;
   skus: string[];
   aiLocales: string[];
+  marketLocales: string[];
   onChange: (m: ProductMedia) => void;
   onMove: (delta: number) => void;
   onRemove: () => void;
@@ -102,7 +104,7 @@ function MediaRow(props: {
           </Show>
         </div>
         <div class="grid gap-4 sm:grid-cols-3">
-          <For each={CONTENT_LOCALES}>
+          <For each={altTextLocales(props.marketLocales, props.media.alt_i18n ?? {})}>
             {(l) => (
               <TextField
                 label={`${t("editor.altText")} (${l})`}
@@ -180,6 +182,8 @@ export function MediaManager(props: {
     () => "product",
     () => props.aiMarksFor,
   );
+  const markets = useMarkets();
+  const marketLocales = () => (markets.data?.items ?? []).flatMap((m) => m.locales);
   const aiLocales = (assetId: string) =>
     (marks.data?.items ?? []).filter((m) => m.field === altField(assetId)).map((m) => m.locale);
   let input!: HTMLInputElement;
@@ -268,6 +272,7 @@ export function MediaManager(props: {
                 count={props.media.length}
                 skus={props.skus}
                 aiLocales={aiLocales(m().asset_id)}
+                marketLocales={marketLocales()}
                 onChange={(next) => props.onChange(props.media.map((x, j) => (j === i ? next : x)))}
                 onMove={(d) => props.onChange(move(props.media, i, d))}
                 onRemove={() => props.onChange(props.media.filter((_, j) => j !== i))}

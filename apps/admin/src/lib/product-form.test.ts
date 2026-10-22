@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  altTextLocales,
   codify,
   DraftError,
   draftFromProduct,
@@ -136,7 +137,7 @@ describe("draftToInput", () => {
       options: [color],
       variants: [{ id: "v1", sku: "A", option_values: { color: "red" }, is_default: true }],
       category_ids: ["c1"],
-      media: [{ asset_id: "a1", alt_i18n: { sk: "foto" } }],
+      media: [{ asset_id: "a1", alt_i18n: { sk: "foto", de: "Foto", "en-GB": "Photo" } }],
       parameters: [],
       tax_categories: { CZ: "reduced" },
       created_at: "",
@@ -147,7 +148,9 @@ describe("draftToInput", () => {
     expect(input.variants?.[0]?.id).toBe("v1");
     expect(input.gpsr?.manufacturer?.email).toBe("a@acme.cz");
     expect(input.tax_categories).toEqual({ CZ: "reduced" });
-    expect(input.media).toEqual([{ asset_id: "a1", alt_i18n: { sk: "foto" } }]);
+    expect(input.media).toEqual([
+      { asset_id: "a1", alt_i18n: { sk: "foto", de: "Foto", "en-GB": "Photo" } },
+    ]);
   });
 });
 
@@ -269,6 +272,33 @@ describe("fillAltTextsLeftBlank", () => {
     expect(fillAltTextsLeftBlank(draft, loaded, stored)).toEqual([
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "Moje", en: "AI en" } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "" } },
+    ]);
+  });
+});
+
+describe("altTextLocales", () => {
+  it("lists the admin content locales when no market adds one", () => {
+    expect(altTextLocales([], {})).toEqual(["cs", "sk", "en"]);
+  });
+
+  it("adds every market locale and every locale the alt texts already have", () => {
+    expect(altTextLocales(["en-GB", "cs", "de"], { fr: "Photo", cs: "Foto" })).toEqual([
+      "cs",
+      "sk",
+      "en",
+      "de",
+      "en-GB",
+      "fr",
+    ]);
+  });
+
+  it("lists a locale once when markets share it", () => {
+    expect(altTextLocales(["de", "de", "pl"], { de: "Foto" })).toEqual([
+      "cs",
+      "sk",
+      "en",
+      "de",
+      "pl",
     ]);
   });
 });
