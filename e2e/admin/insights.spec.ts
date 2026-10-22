@@ -19,6 +19,8 @@ const RECENT = "current_date - 3";
 const BASELINE = "current_date - 12";
 const BEFORE = "current_date - 27";
 const AFTER = "current_date - 10";
+const LATER = "current_date - 2";
+const SEARCH = "e2e zero kabelka";
 const MARK = "e2e:insights";
 const FUNNEL = [
   "sessions",
@@ -45,9 +47,11 @@ function cleanUp(): void {
        DELETE FROM ai_theme_runs WHERE tenant_id = ${DEMO} AND created_by = '${MARK}'`);
   sql(`DELETE FROM insight_signals WHERE tenant_id = ${DEMO}
        AND (kind, subject) IN (('slow_page', 'blog:INP'), ('funnel_drop', 'view_item_to_add_to_cart'),
-                               ('low_add_to_cart', '${weak}'), ('low_add_to_cart', '${strong}'))`);
+                               ('low_add_to_cart', '${weak}'), ('low_add_to_cart', '${strong}'),
+                               ('zero_result_search', '${SEARCH}'))`);
+  sql(`DELETE FROM search_zero_results WHERE tenant_id = ${DEMO} AND query = '${SEARCH}'`);
   sql(`DELETE FROM daily_metrics WHERE tenant_id = ${DEMO} AND market_id = ${MARKET}
-       AND ((date IN (${RECENT}, ${BASELINE}) AND dims = '{}'
+       AND ((date IN (${RECENT}, ${LATER}, ${BASELINE}) AND dims = '{}'
              AND metric IN (${FUNNEL.map((m) => `'${m}'`).join(", ")}))
          OR (date IN (${RECENT}, ${BEFORE}, ${AFTER})
              AND dims->>'product_id' IN ('${weak}', '${strong}')))`);
@@ -109,6 +113,9 @@ test.beforeAll(() => {
        FROM generate_series(1, 1000)`);
   sql(`INSERT INTO analytics_counters (tenant_id, market_id, day, template, requests)
        VALUES (${DEMO}, ${MARKET}, ${RECENT}, 'blog', 100000)`);
+  sql(`INSERT INTO search_zero_results (tenant_id, day, locale, query, count)
+       VALUES (${DEMO}, current_date - 5, 'cs', '${SEARCH}', 7),
+              (${DEMO}, current_date - 1, 'en', '${SEARCH}', 5)`);
   runsBefore = sql(`SELECT count(*) FROM ai_theme_runs WHERE tenant_id = ${DEMO}`);
 });
 
@@ -134,6 +141,7 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
   const slow = list.getByRole("region", { name: "Blog: INP" });
   const drop = list.getByRole("region", { name: "Product viewers who add to cart" });
   const product = list.getByRole("region", { name: weakName, exact: true });
+  const search = list.getByRole("region", { name: `Search for “${SEARCH}”`, exact: true });
 
   const headings = await list.getByRole("heading", { level: 2 }).allTextContents();
   expect(
@@ -162,6 +170,14 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
     ),
   ).toBeVisible();
   await expect(product.getByText("Affected visits: ~108 a week", { exact: true })).toBeVisible();
+  await expect(search.getByRole("heading", { level: 2 })).toHaveText(`Search for “${SEARCH}”`);
+  await expect(
+    search.getByText(
+      "12 searches in the last 14 days found no products (all languages together).",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(search.getByText("Affected visits: ~6 a week", { exact: true })).toBeVisible();
   await expect(product.getByRole("link", { name: weakName })).toHaveAttribute(
     "href",
     `/products/${weak}`,
@@ -178,13 +194,19 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
   ).toBeVisible();
   await expect(ai.locator("blockquote")).toHaveText(draft);
   await expect(ai.getByText("Model: fake", { exact: true })).toBeVisible();
+  await expect(ai.getByText(`Written on ${day(0)}`, { exact: true })).toBeVisible();
   await expectAccessible(admin, "insights (phone)");
   await screenshot(admin, "insights-phone");
+  await search.scrollIntoViewIfNeeded();
+  await screenshot(admin, "insights-search-phone");
 
   await admin.setViewportSize({ width: 1280, height: 900 });
+  await slow.scrollIntoViewIfNeeded();
   await expect(slow).toBeVisible();
   await expectAccessible(admin, "insights (desktop)");
   await screenshot(admin, "insights-desktop");
+  await search.scrollIntoViewIfNeeded();
+  await screenshot(admin, "insights-search-desktop");
 
   const starts: unknown[] = [];
   await admin.route("**/admin/v1/themes/ai-runs", (route) => {
@@ -246,6 +268,28 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
     sql(`SELECT status FROM insight_signals WHERE tenant_id = ${DEMO}
          AND kind = 'funnel_drop' AND subject = 'view_item_to_add_to_cart'`),
   ).toBe("dismissed");
+
+  funnel(LATER, [20_000, 10_000, 600, 300, 150]);
+  const today = new Date().toISOString().slice(0, 10);
+  const rerun = enqueueJob("insights.run", DEMO, { day: today });
+  await eventually(
+    () => sql(`SELECT status FROM queue.jobs WHERE id = ${rerun}`) === "done",
+    90_000,
+  );
+  await admin.reload();
+  await expect(drop).toBeVisible();
+  await expect(drop.getByText("Affected visits: ~800 a week", { exact: true })).toBeVisible();
+  await expect(drop.getByText("Reopened", { exact: true })).toBeVisible();
+  await expect(
+    drop.getByText(`Back since ${day(0)}, up from ~400 a week when dismissed`, { exact: true }),
+  ).toBeVisible();
+  await drop.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "reopened insight (desktop)");
+  await screenshot(admin, "insights-reopened-desktop");
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await drop.scrollIntoViewIfNeeded();
+  await expectAccessible(admin, "reopened insight (phone)");
+  await screenshot(admin, "insights-reopened-phone");
 
   await admin.context().close();
 });
@@ -309,7 +353,7 @@ test("a published theme change shows the weeks before and after", async ({ brows
   sql(`UPDATE insight_signals SET status = 'resolved' WHERE id = ${signal}`);
   await admin.reload();
   await expect(product.getByText("No longer detected", { exact: true })).toBeVisible();
-  await expect(product.getByText(`Last detected on ${day(1)}`, { exact: true })).toBeVisible();
+  await expect(product.getByText(`Last detected on ${day(0)}`, { exact: true })).toBeVisible();
   await expect(product.getByText(/^Detected since/)).toHaveCount(0);
   await expect(change).toBeVisible();
 
