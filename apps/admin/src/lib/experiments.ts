@@ -63,7 +63,9 @@ export function readoutMessage(detail: Schemas["ExperimentDetail"], locale: stri
   const s = r.state;
   switch (s.state) {
     case "collecting":
-      return r.final ? state("notEnough") : COLLECTING[s.need](r, locale);
+      return r.final || (s.need === "time" && detail.experiment.status === "stopped")
+        ? state("notEnough")
+        : COLLECTING[s.need](r, locale);
     case "winner":
       return state(WINNER[s.arm], { chance: chance(r[s.arm].p_best, locale) });
     case "no_difference":

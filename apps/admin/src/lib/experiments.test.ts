@@ -185,6 +185,15 @@ describe("readout sentences of a stopped experiment", () => {
     }
   });
 
+  it("says at once that it stopped before there was enough time", () => {
+    const d = stopped("manual", { state: "collecting", need: "time" });
+    expect(sentences((l) => readoutMessage(d, l))).toEqual({
+      en: "The experiment stopped before there was enough data for a decision.",
+      cs: "Experiment skončil bez dostatku dat pro rozhodnutí.",
+      sk: "Experiment sa skončil bez dostatku údajov na rozhodnutie.",
+    });
+  });
+
   it("keeps counting the last week of visitors after the stop", () => {
     const d = stopped(
       "manual",
